@@ -9,8 +9,7 @@ Created on 2019年4月19日
 @file: FramelessDialog
 @description: 无边框圆角对话框
 """
-from PyQt5.QtCore import Qt, QSize, QTimer, QRect
-from PyQt5.QtGui import QCursor
+from PyQt5.QtCore import Qt, QSize, QTimer
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QWidget,\
     QGraphicsDropShadowEffect, QPushButton, QGridLayout, QSpacerItem,\
     QSizePolicy
@@ -76,7 +75,6 @@ class Dialog(QDialog):
 
     def sizeHint(self):
         return QSize(800, 600)
-
 
 
 if __name__ == '__main__':

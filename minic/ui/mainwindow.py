@@ -113,6 +113,7 @@ class Ui_MainWindow(object):
         self.result_textEdit.setFrameShape(QtWidgets.QFrame.Box)
         self.result_textEdit.setFrameShadow(QtWidgets.QFrame.Sunken)
         self.result_textEdit.setLineWidth(1)
+        self.result_textEdit.setReadOnly(True)
         self.result_textEdit.setObjectName("result_textEdit")
         self.gridLayout_2.addWidget(self.result_textEdit, 0, 0, 1, 1)
         self.tabWidget.addTab(self.tab, "")

@@ -10,10 +10,12 @@
 
 import sys
 
+from PyQt5.QtGui import QTextCursor
 from PyQt5.QtWidgets import QMainWindow, QFileDialog, QApplication
 from PyQt5 import QtGui
 from PyQt5.QtCore import pyqtSlot
 
+from minic.bin.MyStream import MyStream
 from minic.ui import mainwindow
 
 
@@ -33,6 +35,9 @@ class MyMainWindow(QMainWindow):
         super().__init__()
         self.__initUi__()
         self.__bindUi__()
+
+        # 自定义输出流
+        sys.stdout = MyStream(new_text=self.on_update_text)
 
     def __initUi__(self):
         """初始化界面"""
@@ -70,6 +75,20 @@ class MyMainWindow(QMainWindow):
 
         # """方法setToolTip在用户将鼠标停留在按钮上时显示的消息"""
         # button.setToolTip("This is an example button")
+
+    def on_update_text(self, text):
+        """更新输出流
+
+        将控制台输出更新到控件
+
+        :param text: 字符串
+        :return:
+        """
+        cursor = self.__ui.result_textEdit.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        cursor.insertText(text)
+        self.__ui.result_textEdit.setTextCursor(cursor)
+        self.__ui.result_textEdit.ensureCursorVisible()
 
     @pyqtSlot()
     def generate_push_button_on_clicked(self):

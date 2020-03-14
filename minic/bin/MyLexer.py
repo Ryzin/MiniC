@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-@File  : MyToken.py
+@File  : MyLexer.py
 @Author: 罗佳海
 @Date  : 2020/3/9 16:18
 @Desc  : 词法分析
@@ -13,34 +13,41 @@ import ply.lex as lex
 
 # 保留字列表
 reserved = {
-   'if': 'IF',
-   'then': 'THEN',
-   'else': 'ELSE',
-   'while': 'WHILE',
-   # ...
+    'else': 'ELSE',
+    'if': 'IF',
+    'int': 'INT',
+    'return': 'RETURN',
+    'void': 'VOID',
+    'while': 'WHILE',
+    # add more...
 }
 
 
 # 标记列表
-# tokens = (
-#    'NUMBER',
-#    'PLUS',
-#    'MINUS',
-#    'TIMES',
-#    'DIVIDE',
-#    'LPAREN',
-#    'RPAREN',
-#    # 'ID',
-# )
 tokens = [
-             'NUMBER',
              'PLUS',
              'MINUS',
              'TIMES',
              'DIVIDE',
+             'GT',
+             'LT',
+             'GE',
+             'LE',
+             'EQ',
+             'NEQ',
+             'SEMI',
+             'COMMA',
+             'ASSIGN',
              'LPAREN',
              'RPAREN',
+             'LBRACKET',
+             'RBRACKET',
+             'LBRACE',
+             'RBRACE',
+
              'ID',
+             'NUM',
+             'STR',
          ] + list(reserved.values())
 
 
@@ -50,14 +57,35 @@ t_PLUS    = r'\+'
 t_MINUS   = r'-'
 t_TIMES   = r'\*'
 t_DIVIDE  = r'/'
+t_LT      = r'\<'
+t_LE      = r'\<\='
+t_GT      = r'\>'
+t_GE      = r'\>\='
+t_EQ      = r'\=\='
+t_NEQ     = r'\!\='
+t_ASSIGN  = r'\='
+t_SEMI    = r';'
+t_COMMA   = r','
 t_LPAREN  = r'\('
 t_RPAREN  = r'\)'
+t_LBRACKET= r'\['
+t_RBRACKET= r'\]'
+t_LBRACE  = r'\{'
+t_RBRACE  = r'\}'
+
+t_STR     = r"""\".*?\"|\'.*?\'"""
 
 
 # 标记规则
 # 方法表示
-def t_NUMBER(t):
-    r'\d+'
+
+digit      = r'([0-9])'
+letter     = r'([_A-Za-z])'
+identifier = r'(' + letter + r'(' + digit + r'|' + letter + r')*)'
+number     = r'(' + digit + digit + '*)'
+
+
+def t_NUM(t):
     """数字的标记规则
 
     标记值保存数字的整型值
@@ -65,13 +93,14 @@ def t_NUMBER(t):
     :param t: 标记对象
     :return: 标记对象
     """
-    # 因为要扫描 raw string，多行注释不能放在最前面
     t.value = int(t.value)
     return t
 
 
+t_NUM.__doc__ = number
+
+
 def t_ID(t):
-    r'[a-zA-Z_][a-zA-Z_0-9]*'
     """标识符的标记规则
 
     从保留字列表中查找保留字，并保存在标记类型中
@@ -85,6 +114,9 @@ def t_ID(t):
     return t
 
 
+t_ID.__doc__ = identifier
+
+
 def t_newline(t):
     r'\n+'
     """记录行号的标记规则
@@ -94,17 +126,18 @@ def t_newline(t):
     :param t: 标记对象
     :return:
     """
+    # 因为要扫描 raw string，多行注释不能放在最前面
     t.lexer.lineno += len(t.value)
 
 
 def t_COMMENT(t):
-    r'\#.*'
+    r'(\/\/.*)|(\/\*[\s\S]*\*\/)'
     """注释的标记规则
 
     丢弃注释标记，不返回value
 
     :param t: 标记对象
-    :return: No return value. Token discarded
+    :return:
     """
     pass
 
@@ -142,26 +175,35 @@ def t_error(t):
     t.lexer.skip(1)
 
 
+# 测试
 if __name__ == '__main__':
     # 构建 lexer
     lexer = lex.lex()
 
     # 输入字符串
     data = '''
-    # comment
-    if(1)
-        3 + 4 * af
-        + -20 *2
+    // comment
+    void test() {
+        if(flag == 1) {
+            x = 3 + 4 * af;
+            y = -20 /2;
+            a = 1 < 2;
+            a = 3 >= 2;
+            int b = 2, c = 3;
+            int d[4] = 5;
+            e = 1 != 3;
+        }
+    }
+    /* multi line comment
+    line 1
+    line 2
+    */
     '''
 
     # lexer 获得输入
     lexer.input(data)
 
     # Tokenize
-    # while True:
-    #     tok = lexer.token()  # lexer.token() 返回下一个LexToken类型的标记实例，如果进行到输入字串的尾部时将返回None
-    #     if not tok: break  # No more input
-    #     print(tok)
     for tok in lexer:
         print(tok)
         # print(find_column(data, tok))

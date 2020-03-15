@@ -13,7 +13,6 @@
 import ply.lex as lex
 import ply.yacc as yacc
 
-
 reserved = {
     '>': 'GREATERTHAN',
     '<': 'LESSTHAN',
@@ -29,6 +28,7 @@ tokens = [
              'LPAREN',
              'RPAREN',
          ] + list(reserved.values())
+
 
 def MyLexer():
     # Regular expression rules for simple tokens
@@ -69,7 +69,7 @@ precedence = (
     ('nonassoc', 'LESSTHAN', 'GREATERTHAN'),  # 非关联，阻止比较运算符的链式比较
     ('left', 'PLUS', 'MINUS'),
     ('left', 'TIMES', 'DIVIDE'),
-    ('right', 'UMINUS'),            # 一元运算符：负号
+    ('right', 'UMINUS'),  # 一元运算符：负号
 )
 
 
@@ -162,16 +162,14 @@ lexer = MyLexer()
 # Build the parser
 parser = yacc.yacc(tabmodule="parsetab", outputdir="output")
 
-
 while True:
-   try:
-       s = input('calc > ')
-   except EOFError:
-       break
-   if not s: continue
-   result = parser.parse(s)
-   print(result)
-
+    try:
+        s = input('calc > ')
+    except EOFError:
+        break
+    if not s: continue
+    result = parser.parse(s)
+    print(result)
 
 # 6.2 将语法规则合并
 

@@ -2,19 +2,39 @@
 # -*- coding: utf-8 -*-
 
 """
-@File  : MyMainWindow.py
-@Author: 罗佳海
-@Date  : 2020/3/10 13:53
-@Desc  : 自定义主窗口
+@License: Copyright(C) 2019-2020, South China Normal University.
+@File   : MyMainWindow.py
+@Version: 1.0
+@Author : 罗佳海
+@Date   : 2020/3/10 13:53
+@Desc   : 自定义主窗口
+@History:
+1.  @Author      : 罗佳海
+    @Date        : 2020/3/10
+    @Commit      : -主界面设计-
+    @Modification: 模仿设计指导书设计主界面，绑定按钮信号槽，已经可以打开文件等
+
+2.  @Author      : 罗佳海
+    @Date        : 2020/3/11
+    @Commit      : -捕获控制台输出到GUI-
+    @Modification: 为了捕获控制台输出到GUI，定义槽事件来接收MyStream发来的信号，触发更新文本的方法
+
+3.  @Author      : 罗佳海
+    @Date        : 2020/3/18
+    @Commit      : -生成语法树并用以GUI显示-
+    @Modification: 利用深度优先遍历语法树节点，并添加节点到QTreeWidget输出
 """
 
 import sys
 
-from PyQt5.QtGui import QTextCursor
-from PyQt5.QtWidgets import QMainWindow, QFileDialog, QApplication
+from PyQt5.QtGui import QTextCursor, QTextBlockFormat, QColor, QBrush
+from PyQt5.QtWidgets import QMainWindow, QFileDialog, QApplication, QTreeWidgetItem
 from PyQt5 import QtGui
 from PyQt5.QtCore import pyqtSlot
 
+
+from minic.bin.MyLexer import MyLexer
+from minic.bin.MyParser import MyParser
 from minic.bin.MyStream import MyStream
 from minic.ui import mainwindow
 
@@ -53,6 +73,13 @@ class MyMainWindow(QMainWindow):
 
         self.__ui.setupUi(self)
 
+        # # 设置行高
+        # text_cursor = self.__ui.code_textEdit.textCursor()
+        # text_block_format = QTextBlockFormat()
+        # text_block_format.setLineHeight(20, QTextBlockFormat.FixedHeight)  # 设置固定行高
+        # text_cursor.setBlockFormat(text_block_format)
+        # self.__ui.code_textEdit.setTextCursor(text_cursor)
+
     def __bindUi__(self):
         """绑定信号槽"""
         # 普通按钮
@@ -61,6 +88,8 @@ class MyMainWindow(QMainWindow):
         self.__ui.reset_pushButton.clicked.connect(self.reset_all_action_on_triggered)
 
         # 单选按钮
+        self.__ui.source_code_radioButton.clicked.connect(self.source_code_radio_button_on_checked)
+        self.__ui.code_instructions_radioButton.clicked.connect(self.code_instructions_radio_button_on_checked)
         self.__ui.horizontal_tree_radioButton.clicked.connect(self.horizontal_tree_radio_button_on_checked)
         self.__ui.vertical_tree_radioButton.clicked.connect(self.vertical_tree_radio_button_on_checked)
 
@@ -97,6 +126,56 @@ class MyMainWindow(QMainWindow):
         print("生成")
         self.__ui.tabWidget.setCurrentIndex(0)  # 跳到第一个tab
         self.__ui.result_textEdit.setText(self.__ui.code_textEdit.toPlainText())
+
+        # 词法分析
+        # 构建词法分析器
+        lexer = MyLexer()
+
+        # 测试用例1
+        s1 = """
+        /* A program to perform Euclid's
+           Algorithm to compute gcd. */
+
+        int gcd (int u, int v)
+        {   if (v == 0)return u;
+            else return gcd(v, u-u/v*v);
+            /* u-u/v*v == u mod v */
+        }
+
+        void main() {
+            int x; int y;
+            x = input();
+            y = input();
+            output(gcd(x, y));
+        }
+        """
+
+        # 词法分析器获得输入
+        lexer.input(s1)
+
+        # 语法分析
+        # 构建语法分析器
+        parser = MyParser()
+
+        # 语法分析器分析输入
+        root_node = parser.parse(s1, lexer=lexer)
+
+        # 更新QTreeWidget组件
+        self.update_tree_widget(root_node)
+
+    @pyqtSlot()
+    def source_code_radio_button_on_checked(self):
+        """选择源代码输入的槽函数"""
+        # TODO
+        print("输入：源代码")
+        self.__ui.groupBox.setTitle("源代码")
+
+    @pyqtSlot()
+    def code_instructions_radio_button_on_checked(self):
+        """选择代码指令输入的槽函数"""
+        # TODO
+        print("输入：代码指令")
+        self.__ui.groupBox.setTitle("代码指令")
 
     @pyqtSlot()
     def horizontal_tree_radio_button_on_checked(self):
@@ -168,6 +247,50 @@ class MyMainWindow(QMainWindow):
         # TODO
         print("重置全部")
         self.__ui.code_textEdit.clear()
+
+    def update_tree_widget(self, root_node_obj):
+        """更新QTreeWidget组件
+
+        以在GUI上显示语法树
+
+        :param root_node_obj: 语法树根节点
+        :return:
+        """
+        tree_widget = self.__ui.result_treeWidget
+        tree_widget.clear()
+        tree_widget.setColumnCount(1)  # 列数
+
+        # 设置QTreeWidget根节点
+        root_tree_widget_item = QTreeWidgetItem(tree_widget)
+        root_tree_widget_item.setText(0, root_node_obj.name)
+        root_tree_widget_item.setBackground(0, QBrush(QColor("#BDB76B")))
+
+        # 深度优先遍历
+        for node_name, node_obj in root_node_obj.items():
+            self.dump_node_obj(node_obj, root_tree_widget_item)
+
+        # 添加QTreeWidget根节点到组件
+        # tree_widget.addTopLevelItem(root_tree_widget_item)
+
+        # QTreeWidget节点全部展开
+        tree_widget.expandAll()
+
+    def dump_node_obj(self, cur_node_obj, parent_tree_widget_item):
+        """为QTreeWidget组件添加节点
+
+        深度优先遍历语法树节点，并添加到QTreeWidget组件
+
+        :param cur_node_obj: 语法树子节点
+        :param parent_tree_widget_item: 父 QTreeWidgetItem 节点
+        :return:
+        """
+        child_tree_widget_item = QTreeWidgetItem(parent_tree_widget_item)
+        child_tree_widget_item.setText(0, str(cur_node_obj.name))
+        if not cur_node_obj.items():
+            # 叶子
+            child_tree_widget_item.setBackground(0, QBrush(QColor("#90EE90")))
+        for node_name, node_obj in cur_node_obj.items():
+            self.dump_node_obj(node_obj, child_tree_widget_item)
 
 
 if __name__ == '__main__':

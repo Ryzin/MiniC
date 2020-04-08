@@ -210,7 +210,7 @@ if __name__ == '__main__':
     for tok in lexer:
         print(tok)
         # print(find_column(data, tok))
-        # print(tok.type, tok.value, tok.line, tok.lexpos)
+        # print(tok.type, tok.value, tok.lineno, tok.lexpos)
         # tok.type 和 tok.value 属性表示标记本身的类型和值。
         # tok.line 和 tok.lexpos 属性包含了标记的位置信息，
         # tok.lexpos 表示标记相对于输入串起始位置的偏移。

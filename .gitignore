@@ -3,3 +3,6 @@
 *.pyc
 docs/FramelessDialog.py
 docs/MyDialog.py
+minic/bin/parselog.txt
+minic/bin/parser.out
+minic/bin/parsetab.py

@@ -22,7 +22,7 @@
 3.  @Author      : 罗佳海
     @Date        : 2020/3/18
     @Commit      : -生成语法树并用以GUI显示-
-    @Modification: 利用深度优先遍历语法树节点，并添加节点到QTreeWidget输出
+    @Modification: 遍历语法树节点，并添加节点到QTreeWidget输出
 """
 
 import sys
@@ -260,37 +260,39 @@ class MyMainWindow(QMainWindow):
         tree_widget.clear()
         tree_widget.setColumnCount(1)  # 列数
 
-        # 设置QTreeWidget根节点
-        root_tree_widget_item = QTreeWidgetItem(tree_widget)
-        root_tree_widget_item.setText(0, root_node_obj.name)
-        root_tree_widget_item.setBackground(0, QBrush(QColor("#BDB76B")))
-
-        # 深度优先遍历
-        for node_name, node_obj in root_node_obj.items():
-            self.dump_node_obj(node_obj, root_tree_widget_item)
+        # 遍历
+        root_tree_widget_item = self.build_widget_tree(root_node_obj)
 
         # 添加QTreeWidget根节点到组件
-        # tree_widget.addTopLevelItem(root_tree_widget_item)
+        tree_widget.addTopLevelItem(root_tree_widget_item)
 
         # QTreeWidget节点全部展开
         tree_widget.expandAll()
 
-    def dump_node_obj(self, cur_node_obj, parent_tree_widget_item):
+    def build_widget_tree(self, root_node_obj):
+        return self.dump(root_node_obj)
+
+    def dump(self, node_obj):
         """为QTreeWidget组件添加节点
 
-        深度优先遍历语法树节点，并添加到QTreeWidget组件
+        遍历语法树节点，并添加到QTreeWidget组件
 
-        :param cur_node_obj: 语法树子节点
-        :param parent_tree_widget_item: 父 QTreeWidgetItem 节点
+        :param node_obj: 语法树节点
+        :param tree_widget_item: QTreeWidgetItem 节点
         :return:
         """
-        child_tree_widget_item = QTreeWidgetItem(parent_tree_widget_item)
-        child_tree_widget_item.setText(0, str(cur_node_obj.name))
-        if not cur_node_obj.items():
-            # 叶子
-            child_tree_widget_item.setBackground(0, QBrush(QColor("#90EE90")))
-        for node_name, node_obj in cur_node_obj.items():
-            self.dump_node_obj(node_obj, child_tree_widget_item)
+        tree_widget_item = QTreeWidgetItem()
+        tree_widget_item.setText(0, str(node_obj.name))
+        if not node_obj.child:  # child为空或None即为叶子
+            tree_widget_item.setBackground(0, QBrush(QColor("#90EE90")))
+
+        for obj in node_obj.child:
+            tree_widget_item.addChild(self.dump(obj))
+
+        if node_obj.sibling is not None:
+            tree_widget_item.addChild(self.dump(node_obj.sibling))
+
+        return tree_widget_item
 
 
 if __name__ == '__main__':

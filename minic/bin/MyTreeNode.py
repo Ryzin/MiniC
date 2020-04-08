@@ -15,6 +15,48 @@
     @Modification: 设计自定义节点类
 """
 
+from enum import Enum
+
+
+class NodeKind(Enum):
+    StmtK = 'StmtK'
+    ExpK = 'ExpK'
+
+
+class ExpKind(Enum):
+    OP_K = 'OpK'
+    CONST_K = 'ConstK'
+    ID_K = 'IdK'
+    ARRAY_K = 'ArrayK'
+
+
+class StmtKind(Enum):
+    IF_K = 'IfK'
+    ITERATION_K = 'IterationK'
+    ASSIGN_K = 'AssignK'
+    RETURN_K = 'Return_K'
+
+
+class ExpType(Enum):
+    VOID = 'void'
+    INT = 'int'
+
+
+class NodeAttr(object):  # 在语法分析时确定
+    node_kind = None  # NodeKind
+    kind = None  # StmtKind or ExpKind
+
+    def __init__(self, node_kind, kind):
+        self.node_kind = node_kind
+        self.kind = kind
+
+
+class TokenAttr(object):  # 在语义分析时确定
+    exp_type = None  # ExpType，便于类型检查
+
+    def __init__(self, exp_type):
+        self.exp_type = exp_type
+
 
 class MyTreeNode(object):
     """自定义节点类
@@ -23,20 +65,21 @@ class MyTreeNode(object):
 
     Attributes:
         name: 当前节点名
-        __parent: 父节点对象
-        __child: 保存子节点对象的字典
+        sibling: 兄弟节点对象
+        child: 保存子节点对象的列表
     """
 
-    name = None
-    __parent = None
-    __child = None
+    name = None  # 便于打印语法树
+    child = None  # 以列表形式存储，便于顺序遍历
+    sibling = None  # 以链表形式存储各个statement节点树根，而不是存储到child，是因为不能确定statement的数量
+    lineno = None  # 便于构建符号表
+    attr = None
 
-    def __init__(self, node_name, parent=None):
+    def __init__(self, node_name):
         """类的构造函数"""
         super(MyTreeNode, self).__init__()
         self.name = node_name
-        self.__parent = parent
-        self.__child = {}
+        self.child = []
 
     def __repr__(self):
         """将对象转化为对象的string格式"""
@@ -44,83 +87,18 @@ class MyTreeNode(object):
 
     def __contains__(self, item):
         """便于用in操作符，判断是否存在指定子节点"""
-        return item in self.__child
+        return item in self.child
 
-    # def __len__(self):
-    #     """返回当前节点的子节点数"""
-    #     return len(self.__child)
-    #
-    # def __bool__(self, item):
-    #     """当节点存在时总返回True"""
-    #     return True
+    def add_child(self, obj):
+        if isinstance(obj, MyTreeNode):  # obj is node_obj
+            self.child.append(obj)
+        else:  # obj is node_name
+            self.child.append(MyTreeNode(obj))
 
-    def get_child(self, child_name, default=None):
-        """获取当前节点下的指定子节点
+    def print(self):
+        self.traverse()
 
-        通过字典的get方法查找子节点
-
-        :param child_name: 键值为节点名
-        :param default: 指定键的值不存在时，返回None
-        :return: 节点对象
-        """
-        return self.__child.get(child_name, default)
-
-    def add_child(self, child_name, node_obj=None):
-        """为当前节点添加子节点
-
-        :param child_name: 节点名
-        :param node_obj: 节点对象
-        :return: 添加的子节点对象
-        """
-        if node_obj and not isinstance(node_obj, MyTreeNode):
-            raise ValueError('节点只能添加一个节点对象作为子节点')
-        if node_obj is None:
-            node_obj = MyTreeNode(child_name)
-        node_obj.parent = self
-        self.__child[child_name] = node_obj
-        return node_obj
-
-    def remove_child(self, node_name):
-        """从当前节点下删除指定子节点
-
-        :param node_name: 节点名
-        :return:
-        """
-        if node_name in self.__child:
-            del self.__child[node_name]
-
-    def find_child(self, path, create=False):
-        """沿路径或根据节点名查找子节点
-
-        在当前节点下，根据路径或节点名查找子节点，找不到返回None
-
-        :param path: 由节点名组成，空格分隔的节点路径字符串
-        :param create: 在节点不存在时是否创建
-        :return: 子节点对象
-        """
-        # 将字符串以空格分隔，保存到list
-        path = path if isinstance(path, list) else path.split()
-        cur = self
-        node_obj = None
-        for sub in path:
-            node_obj = cur.get_child(sub)
-            if node_obj is None and create:
-                # 找不到子节点时创建
-                node_obj = cur.add_child(sub)
-            # 判断当前查找是否结束
-            if node_obj is None:
-                break
-            cur = node_obj
-        return node_obj
-
-    def items(self):
-        """便于以迭代方式遍历节点
-
-        :return: 字典以列表返回可遍历的(键, 值)元组数组
-        """
-        return self.__child.items()
-
-    def dump(self, indent=0):
+    def traverse(self, indent=0):
         """打印树结构
 
         遍历所有节点打印
@@ -130,68 +108,48 @@ class MyTreeNode(object):
         """
         tab = '    ' * (indent - 1) + ' |- ' if indent > 0 else ''
         print('%s%s' % (tab, self.name))
-        for node_name, node_obj in self.items():
-            node_obj.dump(indent + 1)
+        for node_obj in self.child:
+            node_obj.traverse(indent + 1)
+
+        if self.sibling is not None:
+            self.sibling.traverse(indent + 1)
 
 
 # 测试
 if __name__ == '__main__':
-    print('test add_child()')
-    root = MyTreeNode('')  # root name is ''
-    a1 = root.add_child('a1')
-    a1.add_child('b1')
-    a1.add_child('b2')
-    a2 = root.add_child('a2')
-    b3 = a2.add_child('b3')
-    b3.add_child('c1')
-    root.dump()
-    # (root)
-    #  |- a1
-    #      |- b1
-    #      |- b2
-    #  |- a2
-    #      |- b3
-    #          |- c1
+    child_a1 = MyTreeNode('a1')
+    child_a1.child.append(MyTreeNode('b1'))
+    child_a1.child.append(MyTreeNode('b2'))
+    child_a2 = MyTreeNode('a2')
+    child_a2.child.append(MyTreeNode('b3'))
+    child_a2.child.append(MyTreeNode('c1'))
+    sibling_d1 = MyTreeNode('d1')
+    sibling_d2 = MyTreeNode('d2')
+    sibling_d3 = MyTreeNode('d3')
+    sibling_d4 = MyTreeNode('d4')
+    sibling_d5 = MyTreeNode('d5')
+    sibling_d6 = MyTreeNode('d6')
+    sibling_d1.sibling = sibling_d2
+    sibling_d2.sibling = sibling_d3
+    sibling_d3.sibling = sibling_d4
+    sibling_d4.sibling = sibling_d5
+    child_a2.sibling = sibling_d1
+    root = MyTreeNode('root')  # root name is 'root'
+    root.sibling = sibling_d6
+    root.child.append(child_a1)
+    root.child.append(child_a2)
 
-    print('test items()')
-    for name, obj in a1.items():
-        print(name, obj)
-    # b1 TreeNode(b1)
-    # b2 TreeNode(b2)
-
-    print('test operator "in"')
-    print("b2 is a1's child = %s" % ('b2' in a1))
-    # b2 is a1's child = True
-
-    print('test del_child()')
-    a1.remove_child('b2')
-    root.dump()
-    print("b2 is a1's child = %s" % ('b2' in a1))
-    # (root)
-    #  |- a1
-    #      |- b1
-    #  |- a2
-    #      |- b3
-    #          |- c1
-    # b2 is a1's child = False
-
-    print('test find_child()')
-    obj = root.find_child('a2 b3 c1')
-    print(obj)
-    # TreeNode(c1)
-
-    print('test find_child() with create')
-    obj = root.find_child('a1 b1 c2 b1 e1 f1', create=True)
-    print(obj)
-    root.dump()
-    # TreeNode(f1)
-    # (root)
-    # |- a1
-    #     |- b1
-    #         |- c2
-    #             |- b1
-    #                 |- e1
-    #                     |- f1
-    # |- a2
-    #     |- b3
-    #         |- c1
+    root.print()
+    # root
+    # | - a1
+    #     | - b1
+    #     | - b2
+    # | - a2
+    #     | - b3
+    #     | - c1
+    #     | - d1
+    #         | - d2
+    #             | - d3
+    #                 | - d4
+    #                     | - d5
+    # | - d6

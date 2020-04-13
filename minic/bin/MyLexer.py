@@ -134,16 +134,26 @@ def MyLexer():
         # 因为要扫描 raw string，多行注释不能放在最前面
         t.lexer.lineno += len(t.value)
 
+    # def t_comment(t):
+    #     r"""(\/\/.*)|(\/\*(?:[^\*]|\*+[^\/\*])*\*+\/)"""
+    #     """注释的标记规则
+    #
+    #     丢弃注释标记，不返回value
+    #
+    #     :param t: 标记对象
+    #     :return:
+    #     """
+    #     pass
+
+    # C-style comment (/* ... */)
     def t_comment(t):
-        r"""(\/\/.*)|(\/\*(?:[^\*]|\*+[^\/\*])*\*+\/)"""
-        """注释的标记规则
-    
-        丢弃注释标记，不返回value
-    
-        :param t: 标记对象
-        :return:
-        """
-        pass
+        r'/\*(.|\n)*?\*/'
+        t.lexer.lineno += t.value.count('\n')
+
+    # C++-style comment (//...)
+    def t_cpp_comment(t):
+        r'//.*\n'
+        t.lexer.lineno += 1
 
     def find_column(input_data, token):
         """列跟踪的规则

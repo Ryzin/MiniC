@@ -43,8 +43,8 @@ class ExpType(Enum):
 
 
 class NodeAttr(object):  # 在语法分析时确定
-    node_kind = None  # NodeKind
-    kind = None  # StmtKind or ExpKind
+    node_kind = None  # 值可以为NodeKind中的枚举类型，在代码生成时使用该属性
+    kind = None  # 值可以为StmtKind或ExpKind中的枚举类型，在语义分析时使用该属性
 
     def __init__(self, node_kind, kind):
         self.node_kind = node_kind
@@ -52,7 +52,7 @@ class NodeAttr(object):  # 在语法分析时确定
 
 
 class TokenAttr(object):  # 在语义分析时确定
-    exp_type = None  # ExpType，便于类型检查
+    exp_type = None  # ExpType 在代码生成时使用该属性
 
     def __init__(self, exp_type):
         self.exp_type = exp_type

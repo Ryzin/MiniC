@@ -26,8 +26,7 @@ import re
 import ply.yacc as yacc
 
 from minic.bin.MyLexer import tokens, MyLexer
-# from minic.bin.MySymbolTable import MySymbolTable
-from minic.bin.MyTreeNode import MyTreeNode
+from minic.bin.MyTreeNode import MyTreeNode, ExpKind, NodeKind, NodeAttr, StmtKind
 
 
 # location = 0
@@ -154,14 +153,13 @@ def MyParser():
 
     def p_statement_list(p):
         """
-            statementList : statementList statement
+            statementList : statement statementList
                           | empty
         """
+        # 修改语法规则为右递归
         p[0] = MyTreeNode('statementList')
-        if len(p) == 3:
-            p[1].sibling = p[2]
-            for i in range(1, len(p)):
-                p[0].add_child(p[i])
+        for i in range(0, len(p) - 1):
+            p[i].sibling = p[i + 1]
 
     def p_statement(p):
         """
@@ -232,6 +230,8 @@ def MyParser():
                        | simpleExpression
         """
         p[0] = MyTreeNode('expression')
+        if len(p) is 4:
+            p[0].attr = NodeAttr(NodeKind.StmtK, StmtKind.ASSIGN_K)
         for i in range(1, len(p)):
             p[0].add_child(p[i])
 
@@ -243,6 +243,7 @@ def MyParser():
         p[0] = MyTreeNode('var')
         for i in range(1, len(p)):
             p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)  # TODO
 
     def p_simple_expression_relop_additive_expression(p):
         """
@@ -307,6 +308,9 @@ def MyParser():
                    | NUM
         """
         p[0] = MyTreeNode('factor')
+        if isinstance(p[1], MyTreeNode):
+            if p[1].name is "var":
+                p[0].attr = NodeAttr(NodeKind.ExpK, ExpKind.ID_K)  # TODO
         for i in range(1, len(p)):
             p[0].add_child(p[i])
 
@@ -356,7 +360,7 @@ def MyParser():
 
     # Error rule for syntax errors
     def p_error(p):
-        print("Syntax error in input!")
+        print("Syntax error at line of %d" % p.lexer.lineno)
 
     # 构建语法分析器
     # return yacc.yacc(tabmodule="parsetab", outputdir="output")
@@ -457,13 +461,9 @@ if __name__ == '__main__':
     )
     log = logging.getLogger()
 
-    # for tok in lexer:
-    #     print(tok)
-
     # 语法分析器分析输入
     root_node = parser.parse(s1, lexer=lexer, debug=log)
     # parser.parse() 返回起始规则的p[0]
 
     # 控制台输出语法分析树
-    root_node.print()
-    # symbol_table.print_symbol_table()
+    # root_node.print()

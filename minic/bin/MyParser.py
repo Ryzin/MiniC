@@ -351,7 +351,10 @@ def MyParser():
 
     # Error rule for syntax errors
     def p_error(p):
-        print("Syntax error at line of %d" % p.lexer.lineno)
+        if p is not None:
+            print("Syntax error\nAt token '%s' and at line of %d" % (p.value, p.lexer.lineno))
+        else:
+            print("Syntax missing EOF\nAbstract Syntax Tree building failed")
 
     # 构建语法分析器
     # return yacc.yacc(tabmodule="parsetab", outputdir="output")
@@ -365,16 +368,17 @@ if __name__ == '__main__':
     lexer = MyLexer()
 
     # 测试用例1
+    # s1 = """int x"""
     s1 = """
     /* A program to perform Euclid's
        Algorithm to compute gcd. */
-    
+
     int gcd (int u, int v)
     {   if (v == 0)return u;
         else return gcd(v, u-u/v*v);
         /* u-u/v*v == u mod v */
     }
-    
+
     void main() {
         int x; int y;
         x = input();

@@ -71,6 +71,9 @@
            <property name="lineWidth">
             <number>0</number>
            </property>
+           <property name="acceptRichText">
+            <bool>false</bool>
+           </property>
           </widget>
          </item>
         </layout>
@@ -178,6 +181,9 @@
         </item>
         <item>
          <widget class="QGroupBox" name="groupBox_2">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
           <property name="font">
            <font>
             <pointsize>10</pointsize>
@@ -283,15 +289,15 @@
          <string notr="true"/>
         </property>
         <property name="currentIndex">
-         <number>1</number>
+         <number>0</number>
         </property>
-        <widget class="QWidget" name="tab">
+        <widget class="QWidget" name="tab_0">
          <attribute name="title">
-          <string>词法分析</string>
+          <string>控制台</string>
          </attribute>
-         <layout class="QGridLayout" name="gridLayout_2">
+         <layout class="QGridLayout" name="gridLayout_8">
           <item row="0" column="0">
-           <widget class="QTextEdit" name="result_textEdit">
+           <widget class="QTextEdit" name="console_textEdit">
             <property name="frameShape">
              <enum>QFrame::Box</enum>
             </property>
@@ -311,13 +317,55 @@
           </item>
          </layout>
         </widget>
+        <widget class="QWidget" name="tab">
+         <attribute name="title">
+          <string>词法分析</string>
+         </attribute>
+         <layout class="QGridLayout" name="gridLayout_2">
+          <item row="0" column="0">
+           <widget class="QTableWidget" name="lexer_tableWidget">
+            <property name="font">
+             <font>
+              <pointsize>10</pointsize>
+             </font>
+            </property>
+            <attribute name="horizontalHeaderCascadingSectionResizes">
+             <bool>true</bool>
+            </attribute>
+            <attribute name="horizontalHeaderShowSortIndicator" stdset="0">
+             <bool>false</bool>
+            </attribute>
+            <column>
+             <property name="text">
+              <string>类别</string>
+             </property>
+            </column>
+            <column>
+             <property name="text">
+              <string>标记</string>
+             </property>
+            </column>
+            <column>
+             <property name="text">
+              <string>行号</string>
+             </property>
+            </column>
+            <column>
+             <property name="text">
+              <string>偏移</string>
+             </property>
+            </column>
+           </widget>
+          </item>
+         </layout>
+        </widget>
         <widget class="QWidget" name="tab_2">
          <attribute name="title">
           <string>语法分析</string>
          </attribute>
          <layout class="QGridLayout" name="gridLayout_3">
           <item row="0" column="0">
-           <widget class="QTreeWidget" name="result_treeWidget">
+           <widget class="QTreeWidget" name="parser_treeWidget">
             <property name="font">
              <font>
               <pointsize>10</pointsize>

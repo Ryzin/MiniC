@@ -8,16 +8,6 @@
 @Author : 罗佳海
 @Date   : 2020/3/9 16:18
 @Desc   : 词法分析
-@History:
-1.  @Author      : 罗佳海
-    @Date        : 2020/3/11
-    @Commit      : -增加符合Google规范的注释-
-    @Modification: 尝试运行ply官方代码，4.1章
-
-2.  @Author      : 罗佳海
-    @Date        : 2020/3/14
-    @Commit      : -词法分析-
-    @Modification: 增加本次作业需要的词法规则，添加1个测试用例
 """
 import ply.lex as lex
 
@@ -58,6 +48,8 @@ tokens = [
              'ID',
              'NUM',
              # 'STR',
+             # 'INPUT',
+             # 'OUTPUT'
          ] + list(reserved.values())
 
 
@@ -110,7 +102,7 @@ def MyLexer():
     def t_ID(t):
         """标识符的标记规则
 
-        从保留字列表中查找保留字，并保存在标记类型中
+        从保留字列表中查找保留字，并保存在标记类型中；如果不是保留字，类型就为标识符
 
         :param t: 标记对象
         :return: 标记对象

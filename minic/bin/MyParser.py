@@ -8,16 +8,6 @@
 @Author : 罗佳海
 @Date   : 2020/3/14 18:22
 @Desc   : 语法分析
-@History:
-1.  @Author      : 罗佳海
-    @Date        : 2020/3/16
-    @Commit      : -初步添加语法规则-
-    @Modification: 初步添加本次作业需要的语法规则，消除二义性，添加2个测试用例
-
-2.  @Author      : 罗佳海
-    @Date        : 2020/3/18
-    @Commit      : -生成语法树并用以GUI显示-
-    @Modification: 设计自定义节点类，利用yacc的自底向上LR分析构建语法树，并以QTreeWidget输出
 """
 
 import logging
@@ -32,6 +22,7 @@ from minic.bin.MyTreeNode import MyTreeNode, ExpKind, NodeKind, NodeAttr, StmtKi
 # location = 0
 # symbol_table = MySymbolTable()
 
+# TODO 检查声明是否有保留字
 
 def MyParser():
 
@@ -445,8 +436,8 @@ if __name__ == '__main__':
     lexer.input(s1)
 
     # 标记化
-    # for tok in lexer:
-    #     print(tok)
+    for tok in lexer:
+        print(tok)
 
     # 语法分析
     # 构建语法分析器

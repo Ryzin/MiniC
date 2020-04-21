@@ -8,11 +8,6 @@
 @Author : 罗佳海
 @Date   : 2020/3/10 22:28
 @Desc   : 重定向控制台输出到控件
-@History:
-1.  @Author      : 罗佳海
-    @Date        : 2020/3/11
-    @Commit      : -捕获控制台输出到GUI-
-    @Modification: 为了捕获控制台输出到GUI，用一个类来定义信号，发射到MyMainWindow
 """
 from PyQt5 import QtCore
 

@@ -8,21 +8,7 @@
 @Author : 罗佳海
 @Date   : 2020/3/10 13:53
 @Desc   : 自定义主窗口
-@History:
-1.  @Author      : 罗佳海
-    @Date        : 2020/3/10
-    @Commit      : -主界面设计-
-    @Modification: 模仿设计指导书设计主界面，绑定按钮信号槽，已经可以打开文件等
 
-2.  @Author      : 罗佳海
-    @Date        : 2020/3/11
-    @Commit      : -捕获控制台输出到GUI-
-    @Modification: 为了捕获控制台输出到GUI，定义槽事件来接收MyStream发来的信号，触发更新文本的方法
-
-3.  @Author      : 罗佳海
-    @Date        : 2020/3/18
-    @Commit      : -生成语法树并用以GUI显示-
-    @Modification: 遍历语法树节点，并添加节点到QTreeWidget输出
 """
 
 import sys

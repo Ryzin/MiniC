@@ -8,11 +8,6 @@
 @Author : 罗佳海
 @Date   : 2020/3/17 19:19
 @Desc   : 自定义节点类
-@History:
-1.  @Author      : 罗佳海
-    @Date        : 2020/3/18
-    @Commit      : -生成语法树并用以GUI显示-
-    @Modification: 设计自定义节点类
 """
 
 from enum import Enum

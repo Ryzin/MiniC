@@ -9,21 +9,18 @@
 @Date   : 2020/3/14 18:22
 @Desc   : 语法分析
 """
-
 import logging
-import re
 
 import ply.yacc as yacc
 
-from minic.bin.MyLexer import tokens, MyLexer
-from minic.bin.MyTreeNode import MyTreeNode, ExpKind, NodeKind, NodeAttr, StmtKind
-
+from MyLexer import tokens, MyLexer
+from MyTreeNode import MyTreeNode, ExpKind, NodeKind, NodeAttr, StmtKind
 
 # location = 0
 # symbol_table = MySymbolTable()
 
-# TODO 检查声明是否有保留字
 
+# TODO 检查声明是否有保留字
 def MyParser():
 
     # 指定优先级（从低到高）和结合性（左/右结合，非关联）
@@ -358,7 +355,7 @@ def MyParser():
 
     # 构建语法分析器
     # return yacc.yacc(tabmodule="parsetab", outputdir="output")
-    return yacc.yacc()
+    return yacc.yacc(write_tables=0)
 
 
 # 测试
@@ -440,8 +437,8 @@ if __name__ == '__main__':
     lexer.input(s1)
 
     # 标记化
-    for tok in lexer:
-        print(tok)
+    # for tok in lexer:
+    #     print(tok)
 
     # 语法分析
     # 构建语法分析器

@@ -9,10 +9,10 @@
 @Date   : 2020/4/7 11:54
 @Desc   : Tiny 语义分析器
 """
-from minic.bin.MyLexer import MyLexer
-from minic.bin.MyParser import MyParser
-from minic.bin.MySymbolTable import hash_table, st_lookup, st_insert, print_symbol_table
-from minic.bin.MyTreeNode import ExpKind, StmtKind
+from MyLexer import MyLexer
+from MyParser import MyParser
+from MySymbolTable import hash_table, st_lookup, st_insert, print_symbol_table
+from MyTreeNode import ExpKind, StmtKind
 
 # 1. 预定义int input(void)\output(int x)函数，提前添加到符号表中，代码生成也要相应判断
 # 2. （本条待再次确认）函数声明和定义间没有区别（即没有声明只有定义），使用前必须声明，进行函数名

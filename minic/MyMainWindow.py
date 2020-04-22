@@ -10,19 +10,18 @@
 @Desc   : 自定义主窗口
 
 """
-
 import sys
 
-from PyQt5.QtGui import QTextCursor, QTextBlockFormat, QColor, QBrush
+from PyQt5.QtGui import QTextCursor, QColor, QBrush
 from PyQt5.QtWidgets import QMainWindow, QFileDialog, QApplication, QTreeWidgetItem, QHeaderView, QAbstractItemView, \
     QTableWidgetItem, QMessageBox
-from PyQt5 import QtGui, QtWidgets
-from PyQt5.QtCore import pyqtSlot, QFile
+from PyQt5 import QtGui
+from PyQt5.QtCore import pyqtSlot
 
-from minic.bin.MyLexer import MyLexer
-from minic.bin.MyParser import MyParser
-from minic.bin.MyStream import MyStream
-from minic.ui import mainwindow
+from bin.MyLexer import MyLexer
+from bin.MyParser import MyParser
+from bin.MyStream import MyStream
+import mainwindow
 
 
 class MyMainWindow(QMainWindow):

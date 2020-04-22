@@ -9,12 +9,8 @@
 @Date   : 2020/3/19 19:55
 @Desc   : Tiny 代码生成器
 """
-
-
-from minic.bin.MyCodeEmittingUtil import MyCodeEmittingUtil
-from minic.bin.MyLexer import MyLexer
-from minic.bin.MyParser import MyParser
-from minic.bin.MyTreeNode import MyTreeNode
+from MyLexer import MyLexer
+from MyParser import MyParser
 
 
 def gen_stmt(node_obj):

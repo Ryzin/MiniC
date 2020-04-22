@@ -7,9 +7,8 @@
 @Version: 1.0
 @Author : 罗佳海
 @Date   : 2020/3/17 19:19
-@Desc   : 自定义节点类
+@Desc   : 自定义语法树节点类
 """
-
 from enum import Enum
 
 

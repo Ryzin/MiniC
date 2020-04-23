@@ -371,15 +371,21 @@
               <pointsize>10</pointsize>
              </font>
             </property>
+            <property name="horizontalScrollBarPolicy">
+             <enum>Qt::ScrollBarAlwaysOn</enum>
+            </property>
             <property name="editTriggers">
              <set>QAbstractItemView::NoEditTriggers</set>
             </property>
             <property name="horizontalScrollMode">
-             <enum>QAbstractItemView::ScrollPerItem</enum>
+             <enum>QAbstractItemView::ScrollPerPixel</enum>
             </property>
             <property name="headerHidden">
              <bool>true</bool>
             </property>
+            <attribute name="headerMinimumSectionSize">
+             <number>900</number>
+            </attribute>
             <column>
              <property name="text">
               <string notr="true">1</string>

@@ -7,7 +7,7 @@
 @Version: 1.0
 @Author : 罗佳海
 @Date   : 2020/4/7 12:05
-@Desc   : Symbol table implementation
+@Desc   : 符号表实现
 """
 
 

@@ -7,7 +7,7 @@
 @Version: 1.0
 @Author : 罗佳海
 @Date   : 2020/3/9 16:18
-@Desc   : 词法分析
+@Desc   : 词法分析器
 """
 import ply.lex as lex
 
@@ -20,6 +20,8 @@ reserved = {
     'return': 'RETURN',
     'void'  : 'VOID',
     'while' : 'WHILE',
+    'input' : 'INPUT',
+    'output': 'OUTPUT'
     # add more...
 }
 
@@ -126,17 +128,6 @@ def MyLexer():
         # 因为要扫描 raw string，多行注释不能放在最前面
         t.lexer.lineno += len(t.value)
 
-    # def t_comment(t):
-    #     r"""(\/\/.*)|(\/\*(?:[^\*]|\*+[^\/\*])*\*+\/)"""
-    #     """注释的标记规则
-    #
-    #     丢弃注释标记，不返回value
-    #
-    #     :param t: 标记对象
-    #     :return:
-    #     """
-    #     pass
-
     # C-style comment (/* ... */)
     def t_comment(t):
         r'/\*(.|\n)*?\*/'
@@ -174,16 +165,19 @@ def MyLexer():
         :param t: 标记对象
         :return:
         """
-        print("Illegal character '%s'" % t.value[0])
+        print("Illegal character '%s' at line %d" % (t.value[0], t.lineno))
+        t.lexer.noError = False
         t.lexer.skip(1)
 
     # 构建词法分析器
-    return lex.lex()
+    lexer = lex.lex()
+    lexer.noError = True  # 设置有无不合法字符属性的初始值
+    return lexer
 
 
 # 测试
 if __name__ == '__main__':
-    lexer = MyLexer()
+    my_lexer = MyLexer()
 
     # 输入字符串
     data = """
@@ -206,10 +200,10 @@ if __name__ == '__main__':
     """
 
     # 词法分析器获得输入
-    lexer.input(data)
+    my_lexer.input(data)
 
     # 标记化
-    for tok in lexer:
+    for tok in my_lexer:
         print(tok)
         # print(find_column(data, tok))
         # print(tok.type, tok.value, tok.lineno, tok.lexpos)

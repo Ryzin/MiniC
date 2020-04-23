@@ -7,14 +7,18 @@
 @Version: 1.0
 @Author : 罗佳海
 @Date   : 2020/3/14 18:22
-@Desc   : 语法分析
+@Desc   : 语法分析器
 """
 import logging
 
 import ply.yacc as yacc
 
-from MyLexer import tokens, MyLexer
-from MyTreeNode import MyTreeNode, ExpKind, NodeKind, NodeAttr, StmtKind
+# main.py required
+from .MyLexer import tokens, MyLexer
+from .MyTreeNode import MyTreeNode, ExpKind, NodeKind, NodeAttr, StmtKind
+
+# from MyLexer import tokens, MyLexer
+# from MyTreeNode import MyTreeNode, ExpKind, NodeKind, NodeAttr, StmtKind
 
 # location = 0
 # symbol_table = MySymbolTable()
@@ -45,6 +49,7 @@ def MyParser():
         """
         p[0] = MyTreeNode('program')
         p[0].add_child(p[1])
+        p[0].child[0].lineno = p.lineno(1)
 
     def p_declaration_list(p):
         """
@@ -54,6 +59,7 @@ def MyParser():
         p[0] = MyTreeNode('declarationList')
         for i in range(1, len(p)):
             p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)
 
     def p_declaration(p):
         """
@@ -62,6 +68,7 @@ def MyParser():
         """
         p[0] = MyTreeNode('declaration')
         p[0].add_child(p[1])
+        p[0].child[0].lineno = p.lineno(1)
 
     def p_var_declaration_type_specifier(p):
         """
@@ -71,10 +78,9 @@ def MyParser():
 
         p[0] = MyTreeNode('varDeclaration')
 
-        p[0].add_child(p[1])
-        for i in range(2, len(p)):
-            new_node = MyTreeNode(p[i])
-            p[0].add_child(new_node)
+        for i in range(1, len(p)):
+            p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)
 
     def p_type_specifier(p):
         """
@@ -83,6 +89,7 @@ def MyParser():
         """
         p[0] = MyTreeNode('typeSpecifier')
         p[0].add_child(p[1])
+        p[0].child[0].lineno = p.lineno(1)
 
     def p_fun_declaration_type_specifier(p):
         """
@@ -91,6 +98,7 @@ def MyParser():
         p[0] = MyTreeNode('funDeclaration')
         for i in range(1, len(p)):
             p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)
 
     def p_params_param_list(p):
         """
@@ -100,8 +108,10 @@ def MyParser():
         """
         # 增加 empty
         p[0] = MyTreeNode('params')
-        for i in range(1, len(p)):
-            p[0].add_child(p[i])
+        if p[1] is not None:
+            for i in range(1, len(p)):
+                p[0].add_child(p[i])
+                p[0].child[i - 1].lineno = p.lineno(i)
 
     def p_param_list(p):
         """
@@ -111,6 +121,7 @@ def MyParser():
         p[0] = MyTreeNode('paramList')
         for i in range(1, len(p)):
             p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)
 
     def p_param_type_specifier(p):
         """
@@ -120,6 +131,7 @@ def MyParser():
         p[0] = MyTreeNode('param')
         for i in range(1, len(p)):
             p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)
 
     def p_compound_stmt_local_declarations(p):
         """
@@ -128,6 +140,7 @@ def MyParser():
         p[0] = MyTreeNode('compoundStmt')
         for i in range(1, len(p)):
             p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)
 
     def p_local_declarations(p):
         """
@@ -135,9 +148,11 @@ def MyParser():
                               | empty
         """
         p[0] = MyTreeNode('localDeclarations')
-        if len(p) == 3:
+
+        if len(p) is 3:
             for i in range(1, len(p)):
                 p[0].add_child(p[i])
+                p[0].child[i - 1].lineno = p.lineno(i)
 
     def p_statement_list(p):
         """
@@ -146,8 +161,10 @@ def MyParser():
         """
         # 修改语法规则为右递归
         p[0] = MyTreeNode('statementList')
-        for i in range(0, len(p) - 1):
-            p[i].sibling = p[i + 1]
+        if len(p) is 3:
+            for i in range(0, len(p) - 1):  # statementList -> statement -> statementList ->
+                p[i + 1].lineno = p.lineno(i)
+                p[i].sibling = p[i + 1]
 
     def p_statement(p):
         """
@@ -156,10 +173,12 @@ def MyParser():
                       | ifStmt
                       | iterationStmt
                       | returnStmt
+                      | outputStmt
         """
-        # selectionStmt 更名为 ifStmt
+        # selectionStmt 更名为 ifStmt，增加outputStmt
         p[0] = MyTreeNode('statement')
         p[0].add_child(p[1])
+        p[0].child[0].lineno = p.lineno(1)
 
     def p_expression_stmt(p):
         """
@@ -169,8 +188,8 @@ def MyParser():
         p[0] = MyTreeNode('expressionStmt')
         for i in range(1, len(p)):
             p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)
 
-    # TODO 在纸上推导出无二义性的 if-else 文法
     def p_if_stmt(p):
         """
             ifStmt : IF LPAREN expression RPAREN statement elseStmt
@@ -178,6 +197,7 @@ def MyParser():
         p[0] = MyTreeNode('ifStmt')
         for i in range(1, len(p)):
             p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)
 
     def p_else_stmt(p):
         """
@@ -187,7 +207,9 @@ def MyParser():
         p[0] = MyTreeNode('elseStmt')
         for i in range(1, len(p)):
             p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)
 
+    # TODO 推导出无二义性的 if-else 文法
     # def p_if_stmt(p):
     #     """
     #         ifStmt : IF LPAREN expression RPAREN statement
@@ -202,6 +224,7 @@ def MyParser():
         p[0] = MyTreeNode('iterationStmt')
         for i in range(1, len(p)):
             p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)
 
     def p_return_stmt(p):
         """
@@ -211,17 +234,30 @@ def MyParser():
         p[0] = MyTreeNode('returnStmt')
         for i in range(1, len(p)):
             p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)
+
+    def p_output_stmt(p):
+        """
+            outputStmt : OUTPUT LPAREN expression RPAREN SEMI
+        """
+        p[0] = MyTreeNode('outputStmt')
+        for i in range(1, len(p)):
+            p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)
 
     def p_expression_var(p):
         """
             expression : var ASSIGN expression
                        | simpleExpression
+                       | inputExpression
         """
+        # 增加inputExpression
         p[0] = MyTreeNode('expression')
         if len(p) is 4:
             p[0].attr = NodeAttr(NodeKind.StmtK, StmtKind.ASSIGN_K)
         for i in range(1, len(p)):
             p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)
 
     def p_var_id(p):
         """
@@ -231,7 +267,7 @@ def MyParser():
         p[0] = MyTreeNode('var')
         for i in range(1, len(p)):
             p[0].add_child(p[i])
-            p[0].child[i - 1].lineno = p.lineno(i)  # TODO
+            p[0].child[i - 1].lineno = p.lineno(i)
 
     def p_simple_expression_relop_additive_expression(p):
         """
@@ -241,6 +277,17 @@ def MyParser():
         p[0] = MyTreeNode('simpleExpression')
         for i in range(1, len(p)):
             p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)
+
+    def p_input_expression(p):
+        """
+            inputExpression : INPUT LPAREN VOID RPAREN
+                            | INPUT LPAREN RPAREN
+        """
+        p[0] = MyTreeNode('inputExpression')
+        for i in range(1, len(p)):
+            p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)
 
     def p_relop(p):
         """
@@ -253,6 +300,7 @@ def MyParser():
         """
         p[0] = MyTreeNode('relop')
         p[0].add_child(p[1])
+        p[0].child[0].lineno = p.lineno(1)
 
     def p_additive_expression_addop_term(p):
         """
@@ -262,6 +310,7 @@ def MyParser():
         p[0] = MyTreeNode('additiveExpression')
         for i in range(1, len(p)):
             p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)
 
     def p_addop(p):
         """
@@ -270,6 +319,7 @@ def MyParser():
         """
         p[0] = MyTreeNode('addop')
         p[0].add_child(p[1])
+        p[0].child[0].lineno = p.lineno(1)
 
     def p_term_mulop_factor(p):
         """
@@ -279,6 +329,7 @@ def MyParser():
         p[0] = MyTreeNode('term')
         for i in range(1, len(p)):
             p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)
 
     def p_mulop(p):
         """
@@ -287,6 +338,7 @@ def MyParser():
         """
         p[0] = MyTreeNode('mulop')
         p[0].add_child(p[1])
+        p[0].child[0].lineno = p.lineno(1)
 
     def p_factor(p):
         """
@@ -301,6 +353,7 @@ def MyParser():
                 p[0].attr = NodeAttr(NodeKind.ExpK, ExpKind.ID_K)  # TODO
         for i in range(1, len(p)):
             p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)
 
     # 一元运算符：负号
     # %prec UMINUS 覆盖了默认的优先级（MINUS的优先级）
@@ -312,6 +365,7 @@ def MyParser():
         p[0] = MyTreeNode('factor')
         for i in range(1, len(p)):
             p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)
 
     def p_call(p):
         """
@@ -320,6 +374,7 @@ def MyParser():
         p[0] = MyTreeNode('call')
         for i in range(1, len(p)):
             p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)
 
     def p_args(p):
         """
@@ -329,6 +384,7 @@ def MyParser():
         p[0] = MyTreeNode('args')
         if isinstance(p[1], MyTreeNode):
             p[0].add_child(p[1])
+            p[0].child[0].lineno = p.lineno(1)
 
     def p_arg_list(p):
         """
@@ -338,6 +394,7 @@ def MyParser():
         p[0] = MyTreeNode('argList')
         for i in range(1, len(p)):
             p[0].add_child(p[i])
+            p[0].child[i - 1].lineno = p.lineno(i)
 
     # 空产生式
     def p_empty(p):
@@ -349,9 +406,9 @@ def MyParser():
     # Error rule for syntax errors
     def p_error(p):
         if p is not None:
-            print("Syntax error\nAt token '%s' and at line of %d" % (p.value, p.lexer.lineno))
+            print("Syntax error\nUnexpected %s token '%s' and at line %d" % (p.type, p.value, p.lineno))
         else:
-            print("Syntax missing EOF\nAbstract Syntax Tree building failed")
+            print("Syntax missing EOF")
 
     # 构建语法分析器
     # return yacc.yacc(tabmodule="parsetab", outputdir="output")
@@ -442,7 +499,7 @@ if __name__ == '__main__':
 
     # 语法分析
     # 构建语法分析器
-    parser = MyParser()
+    my_parser = MyParser()
 
     # 设置 logging 对象
     logging.basicConfig(
@@ -454,7 +511,7 @@ if __name__ == '__main__':
     log = logging.getLogger()
 
     # 语法分析器分析输入
-    root_node = parser.parse(s1, lexer=lexer, debug=log)
+    root_node = my_parser.parse(s1, lexer=lexer, debug=log)
     # parser.parse() 返回起始规则的p[0]
 
     # 控制台输出语法分析树

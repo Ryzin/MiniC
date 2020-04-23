@@ -18,6 +18,7 @@ from PyQt5.QtWidgets import QMainWindow, QFileDialog, QApplication, QTreeWidgetI
 from PyQt5 import QtGui
 from PyQt5.QtCore import pyqtSlot
 
+from bin.MyLexer import tokens
 from bin.MyLexer import MyLexer
 from bin.MyParser import MyParser
 from bin.MyStream import MyStream
@@ -160,20 +161,29 @@ class MyMainWindow(QMainWindow):
             return
 
         # 更新词法分析QTableWidget组件
-        self.update_lexer_table_widget(lexer.clone())
-        print("Token List has been generated")
+        self.update_lexer_table_widget(lexer)  # 进行了第1次lex扫描
 
-        # 语法分析
-        # 构建语法分析器
-        parser = MyParser()
+        if lexer.noError is True:  # 词法分析是否有错误（曾调用p_error方法）
+            print("Token List has been generated")
 
-        # 语法分析器分析输入
-        root_node = parser.parse(s, lexer=lexer)
+            lexer.lineno = 1  # 因为已经扫描过一次，行号重置避免累加
 
-        # # 更新语法分析QTreeWidget组件
-        if root_node is not None:
-            self.update_parser_tree_widget(root_node)
-            print("Abstract Syntax Tree has been generated\nBuild successfully")
+            # 语法分析
+            # 构建语法分析器
+            parser = MyParser()
+
+            # 语法分析器分析输入
+            root_node = parser.parse(s, lexer=lexer)  # 进行了第2次lex扫描
+
+            if parser.errorok:  # 语法分析是否有错误（曾调用p_error方法）
+                # 更新语法分析QTreeWidget组件
+                if root_node is not None:
+                    self.update_parser_tree_widget(root_node)
+                    print("Syntax Tree has been generated\nBuild successfully")
+            else:
+                print("Syntax Tree building failed")
+        else:
+            print("Token List building failed")
 
     @pyqtSlot()
     def source_code_radio_button_on_checked(self):

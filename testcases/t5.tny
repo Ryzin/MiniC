@@ -1,0 +1,7 @@
+int minloc(int a[], int low, int high) {  
+  if(a[i]< 1)
+  {   x =a[i];
+      k=i + 1;
+  }
+  return k;
+}

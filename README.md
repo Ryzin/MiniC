@@ -21,37 +21,56 @@
 <br/>
 <br/>
 
-## 项目目录结构
+## 文件清单
+
+- 可执行程序
+
+```python
+exe  
+│     
+└─ main.exe                                打开 main.exe 即可运行
+```
+
+<br/>
+
+- 源代码
 
 ```python
 # 每一个 py 文件都可以独立测试运行  
-
-├── MiniC
-│      │  
-│      ├── exe                                    其中的 main.exe 为可执行文件入口  
-│      │     
-│      ├── minic
-│      │      │    
-│      │      ├── bin
-│      │      │      │
-│      │      │      ├── MyCodeEmittingUtil.py    Tiny VM Code emitting utilities（未完成）
-│      │      │      ├── MyCodeGenerator.py       Tiny 代码生成器（未完成）
-│      │      │      ├── MyLexer.py               词法分析器
-│      │      │      ├── MyParser.py              语法分析器
-│      │      │      ├── MySemanticAnalyzer.py    语义分析器（未完成）
-│      │      │      ├── MyStream.py              重定向控制台输出
-│      │      │      ├── MySymbolTable.py         符号表实现
-│      │      │      └── MyTreeNode.py            自定义语法树节点类
-│      │      │                            
-│      │      ├── mainwindow.py                   mainwindow.ui的实现（PyQt自动生成）
-│      │      ├── mainwindow.ui                   PyQt Designer设计的界面
-│      │      ├── MyMainWindow.py                 自定义主窗口（绑定mainwindow）
-│      │      └── main.py                         程序入口
-│      │ 
-│      └── testcases                              测试用例
+MiniC
+│     
+├── img                                    展示图片
 │      
-└──  README.md
+├── minic                                  实际源代码根目录
+│      │    
+│      ├── bin
+│      │      │
+│      │      ├── MyCodeEmittingUtil.py    Tiny VM Code emitting utilities（未完成）
+│      │      ├── MyCodeGenerator.py       Tiny 代码生成器（未完成）
+│      │      ├── MyLexer.py               词法分析器
+│      │      ├── MyParser.py              语法分析器
+│      │      ├── MySemanticAnalyzer.py    语义分析器（未完成）
+│      │      ├── MyStream.py              重定向控制台输出
+│      │      ├── MySymbolTable.py         符号表实现
+│      │      └── MyTreeNode.py            自定义语法树节点类
+│      │                            
+│      ├── mainwindow.py                   mainwindow.ui的实现（PyQt自动生成）
+│      ├── mainwindow.ui                   PyQt Designer设计的界面
+│      ├── MyMainWindow.py                 自定义主窗口（绑定mainwindow）
+│      └── main.py                         程序入口
+│ 
+├── testcases                              测试用例
+│ 
+└── README.md                              项目说明
 ```
+
+<br/>
+
+- 项目设计报告书 罗佳海 吴梓祺.docx
+  
+<br/>
+
+- README.pdf
 
 <br/>
 <br/>

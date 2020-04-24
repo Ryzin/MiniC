@@ -170,12 +170,12 @@ def MyParser():
         """
             statement : expressionStmt
                       | compoundStmt
-                      | ifStmt
+                      | selectionStmt
                       | iterationStmt
                       | returnStmt
                       | outputStmt
         """
-        # selectionStmt 更名为 ifStmt，增加outputStmt
+        # 增加outputStmt
         p[0] = MyTreeNode('statement')
         p[0].add_child(p[1])
         p[0].child[0].lineno = p.lineno(1)
@@ -190,32 +190,15 @@ def MyParser():
             p[0].add_child(p[i])
             p[0].child[i - 1].lineno = p.lineno(i)
 
-    def p_if_stmt(p):
+    def p_selection_stmt(p):
         """
-            ifStmt : IF LPAREN expression RPAREN statement elseStmt
+            selectionStmt : IF LPAREN expression RPAREN statement
+                          | IF LPAREN expression RPAREN statement ELSE statement
         """
-        p[0] = MyTreeNode('ifStmt')
+        p[0] = MyTreeNode('selectionStmt')
         for i in range(1, len(p)):
             p[0].add_child(p[i])
             p[0].child[i - 1].lineno = p.lineno(i)
-
-    def p_else_stmt(p):
-        """
-            elseStmt : ELSE statement
-                     | statement
-        """
-        p[0] = MyTreeNode('elseStmt')
-        for i in range(1, len(p)):
-            p[0].add_child(p[i])
-            p[0].child[i - 1].lineno = p.lineno(i)
-
-    # TODO 推导出无二义性的 if-else 文法
-    # def p_if_stmt(p):
-    #     """
-    #         ifStmt : IF LPAREN expression RPAREN statement
-    #                | IF LPAREN expression RPAREN statement ELSE statement
-    #     """
-    #     # 有二义性的语法
 
     def p_iteration_stmt(p):
         """
@@ -412,7 +395,7 @@ def MyParser():
 
     # 构建语法分析器
     # return yacc.yacc(tabmodule="parsetab", outputdir="output")
-    return yacc.yacc(write_tables=0)
+    return yacc.yacc()
 
 
 # 测试

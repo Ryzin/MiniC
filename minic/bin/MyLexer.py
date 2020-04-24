@@ -150,7 +150,9 @@ def MyLexer():
         last_cr = input_data.rfind('\n', 0, token.lexpos)
         if last_cr < 0:
             last_cr = 0
-        column = (token.lexpos - last_cr) + 1
+        else:
+            last_cr += 1
+        column = token.lexpos - last_cr
         return column
 
     # 忽略字符

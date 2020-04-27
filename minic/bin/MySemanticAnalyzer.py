@@ -14,7 +14,6 @@ from MyParser import MyParser
 from MySymbolTable import hash_table, st_lookup, st_insert, print_symbol_table
 from MyTreeNode import ExpKind, StmtKind
 
-# 1. 预定义int input(void)\output(int x)函数，提前添加到符号表中，代码生成也要相应判断
 # 2. （本条待再次确认）函数声明和定义间没有区别（即没有声明只有定义），使用前必须声明，进行函数名
 # 和参数数量检查（参数只有整型\空\整型数组）。也要检查返回类型，参数的作用域
 # 3. 数组不用进行越界检查（但元素在符号表的内容如何，location += size？要弄一个数据结构mem存值）
@@ -115,7 +114,7 @@ class MySemanticAnalyzer:
         :param node_obj:
         :return:
         """
-        # if node_obj.name == "expression":
+        # if node_obj.name == "simpleExpression":
 
     def type_check(self, syntax_tree_node_obj):
         """

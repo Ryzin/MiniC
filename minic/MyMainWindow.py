@@ -10,6 +10,7 @@
 @Desc   : 自定义主窗口
 
 """
+import codecs
 import sys
 
 from PyQt5.QtGui import QTextCursor, QColor, QBrush
@@ -83,8 +84,8 @@ class MyMainWindow(QMainWindow):
         # 单选按钮
         self.__ui.source_code_radioButton.clicked.connect(self.source_code_radio_button_on_checked)
         self.__ui.code_instructions_radioButton.clicked.connect(self.code_instructions_radio_button_on_checked)
-        self.__ui.horizontal_tree_radioButton.clicked.connect(self.horizontal_tree_radio_button_on_checked)
-        self.__ui.vertical_tree_radioButton.clicked.connect(self.vertical_tree_radio_button_on_checked)
+        self.__ui.ast_radioButton.clicked.connect(self.ast_radio_button_on_checked)
+        self.__ui.nst_radioButton.clicked.connect(self.nst_radio_button_on_checked)
 
         # 菜单栏选项
         self.__ui.action_N.triggered.connect(self.create_file_action_on_triggered)
@@ -170,7 +171,11 @@ class MyMainWindow(QMainWindow):
 
             # 语法分析
             # 构建语法分析器
-            parser = MyParser()
+            if self.__ui.ast_radioButton.isChecked():
+                tree_type = "AST"
+            else:
+                tree_type = "NST"
+            parser = MyParser(tree_type)
 
             # 语法分析器分析输入
             root_node = parser.parse(s, lexer=lexer)  # 进行了第2次lex扫描
@@ -200,14 +205,14 @@ class MyMainWindow(QMainWindow):
         self.__ui.groupBox.setTitle("代码指令")
 
     @pyqtSlot()
-    def horizontal_tree_radio_button_on_checked(self):
-        """选择文件列表形的语法分析样式的槽函数"""
+    def ast_radio_button_on_checked(self):
+        """选择抽象语法树的语法分析样式的槽函数"""
         # TODO
         # print("语法分析样式：文件列表")
 
     @pyqtSlot()
-    def vertical_tree_radio_button_on_checked(self):
-        """选择多叉树形的语法分析样式的槽函数"""
+    def nst_radio_button_on_checked(self):
+        """选择普通语法树的语法分析样式的槽函数"""
         # TODO
         # print("语法分析样式：多叉树")
 
@@ -220,7 +225,7 @@ class MyMainWindow(QMainWindow):
                                                                 "TNY Files (*.tny);;All Files (*)")
                                                                 # 设置文件扩展名过滤,注意用双分号间隔
         if self.__file_path:
-            file = open(self.__file_path, "w")  # 以写入的方式打开文件
+            file = open(self.__file_path, "w", encoding='UTF-8')  # 以写入的方式打开文件
             with file:
                 data = ""
                 file.write(data)  # 返回值是写入的字符长度
@@ -237,7 +242,7 @@ class MyMainWindow(QMainWindow):
         if self.__file_path:
             print("打开文件\n" + self.__file_path)
             # file = QFile(file_path)  # 创建文件对象，不创建文件对象也不报错 也可以读文件和写文件
-            file = open(self.__file_path, "r")
+            file = open(self.__file_path, "r", encoding='UTF-8')
             with file:  # try
                 data = file.read()
                 self.__ui.code_textEdit.setText(data)
@@ -252,7 +257,7 @@ class MyMainWindow(QMainWindow):
                                                                       "../",
                                                                       "TNY Files (*.tny);;All Files (*)")
         if self.__file_path:  # 再判断一遍，防止取消打开文件
-            file = open(self.__file_path, "w")  # 以写入的方式打开文件
+            file = open(self.__file_path, "w", encoding='UTF-8')  # 以写入的方式打开文件
             with file:
                 data = self.__ui.code_textEdit.toPlainText()
                 file.write(data)  # 返回值是写入的字符长度
@@ -271,7 +276,7 @@ class MyMainWindow(QMainWindow):
                                                     "TNY Files (*.tny);;All Files (*)")
 
         if self.__file_path:
-            file = open(self.__file_path, "w")  # 以写入的方式打开文件
+            file = open(self.__file_path, "w", encoding='UTF-8')  # 以写入的方式打开文件
             with file:
                 data = self.__ui.code_textEdit.toPlainText()
                 file.write(data)  # 返回值是写入的字符长度
@@ -379,7 +384,7 @@ class MyMainWindow(QMainWindow):
         """
         tree_widget_item = QTreeWidgetItem()
         tree_widget_item.setText(0, str(node_obj.name))
-        if not node_obj.child:  # child为空或None即为叶子
+        if not node_obj.child and not node_obj.sibling:  # child、sibling为空或None即为叶子
             tree_widget_item.setBackground(0, QBrush(QColor("#90EE90")))
 
         for obj in node_obj.child:

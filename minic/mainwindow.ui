@@ -99,6 +99,9 @@
         </item>
         <item>
          <widget class="QGroupBox" name="groupBox_3">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
           <property name="font">
            <font>
             <pointsize>10</pointsize>
@@ -182,7 +185,7 @@
         <item>
          <widget class="QGroupBox" name="groupBox_2">
           <property name="enabled">
-           <bool>false</bool>
+           <bool>true</bool>
           </property>
           <property name="font">
            <font>
@@ -219,14 +222,14 @@
               </widget>
              </item>
              <item>
-              <widget class="QRadioButton" name="horizontal_tree_radioButton">
+              <widget class="QRadioButton" name="ast_radioButton">
                <property name="font">
                 <font>
                  <pointsize>10</pointsize>
                 </font>
                </property>
                <property name="text">
-                <string>文件列表</string>
+                <string>AST</string>
                </property>
                <property name="checked">
                 <bool>true</bool>
@@ -234,14 +237,14 @@
               </widget>
              </item>
              <item>
-              <widget class="QRadioButton" name="vertical_tree_radioButton">
+              <widget class="QRadioButton" name="nst_radioButton">
                <property name="font">
                 <font>
                  <pointsize>10</pointsize>
                 </font>
                </property>
                <property name="text">
-                <string>多叉树</string>
+                <string>NST</string>
                </property>
               </widget>
              </item>

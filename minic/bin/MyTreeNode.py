@@ -12,30 +12,6 @@
 from enum import Enum
 
 
-class NodeKind(Enum):
-    StmtK = 'StmtK'
-    ExpK = 'ExpK'
-
-
-class ExpKind(Enum):
-    OP_K = 'OpK'
-    CONST_K = 'ConstK'
-    ID_K = 'IdK'
-    ARRAY_K = 'ArrayK'
-
-
-class StmtKind(Enum):
-    IF_K = 'IfK'
-    ITERATION_K = 'IterationK'
-    ASSIGN_K = 'AssignK'
-    RETURN_K = 'Return_K'
-
-
-class ExpType(Enum):
-    VOID = 'void'
-    INT = 'int'
-
-
 class NodeAttr(object):  # 在语法分析时确定
     node_kind = None  # 值可以为NodeKind中的枚举类型，在代码生成时使用该属性
     kind = None  # 值可以为StmtKind或ExpKind中的枚举类型，在语义分析时使用该属性
@@ -44,12 +20,32 @@ class NodeAttr(object):  # 在语法分析时确定
         self.node_kind = node_kind
         self.kind = kind
 
+    class NodeKind(Enum):
+        StmtK = 'StmtK'
+        ExpK = 'ExpK'
+
+    class ExpKind(Enum):
+        OP_K = 'OpK'
+        CONST_K = 'ConstK'
+        ID_K = 'IdK'
+        ARRAY_K = 'ArrayK'
+
+    class StmtKind(Enum):
+        IF_K = 'IfK'
+        ITERATION_K = 'IterationK'
+        ASSIGN_K = 'AssignK'
+        RETURN_K = 'Return_K'
+
 
 class TokenAttr(object):  # 在语义分析时确定
     exp_type = None  # ExpType 在代码生成时使用该属性
 
     def __init__(self, exp_type):
         self.exp_type = exp_type
+
+    class ExpType(Enum):
+        VOID = 'void'
+        INT = 'int'
 
 
 class MyTreeNode(object):
@@ -74,6 +70,7 @@ class MyTreeNode(object):
         super(MyTreeNode, self).__init__()
         self.name = node_name
         self.child = []
+        self.attr = TokenAttr(TokenAttr.ExpType.INT)
 
     def __repr__(self):
         """将对象转化为对象的string格式"""

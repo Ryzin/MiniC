@@ -13,7 +13,7 @@
 from MyLexer import tokens, MyLexer
 from MyParser import MyParser
 from MySymbolTable import hash_table, st_lookup, st_insert, print_symbol_table
-from MyTreeNode import NodeAttr
+from MyTreeNode import NodeKind, BasicType
 
 # 2. （本条待再次确认）函数声明和定义间没有区别（即没有声明只有定义），使用前必须声明，进行函数名
 # 和参数数量检查（参数只有整型\空\整型数组）。也要检查返回类型，参数的作用域
@@ -24,7 +24,7 @@ from MyTreeNode import NodeAttr
 
 
 class MySemanticAnalyzer:
-    trace_analyze = True
+    trace_analyze = False
     location = 0  # counter for variable memory locations
     scope = 0  # 当前作用域大小，作用域大的标识符可以访问作用域小的标识符
     error = False  # 错误标志
@@ -45,7 +45,7 @@ class MySemanticAnalyzer:
             for obj in node_obj.child:
                 self.traverse(obj, pre_proc, post_proc)
             post_proc(node_obj)
-            self.traverse(node_obj.sibling, pre_proc, post_proc)
+            # self.traverse(node_obj.sibling, pre_proc, post_proc)
 
     def null_proc(self, node_obj):
         """
@@ -66,77 +66,63 @@ class MySemanticAnalyzer:
         :return:
         """
         if node_obj is None:
-            # print("insert_node() got None node_obj")
-            return
-
-        if node_obj.attr is None:
-            # print("insert_node() got None node_obj.attr")
             return
 
         # varDeclaration
-        if node_obj.attr.node_kind is NodeAttr.DeclareKind.VarDeclareK:
+        if node_obj.node_kind is NodeKind.VAR_DECLARE_K:
             if len(node_obj.child) is 3:  # varDeclaration : typeSpecifier ID SEMI
                 if st_lookup(node_obj.child[1].name, self.scope) is None:  # ID
                     # not yet in table, so treat as new definition
-                    st_insert(node_obj.child[1].name, self.location, 'var',
-                              node_obj.attr.basic_type.value, 1, self.scope,
+                    st_insert(node_obj.child[1].name, self.location, NodeKind.VAR_K,
+                              node_obj.basic_type, 1, self.scope,
                               node_obj.child[1].lineno)
                     self.location = self.location + 1
                 else:
-                    self.error = True
-                    print("Semantic error\n'%s' at line %d has been already declared"
-                          % (node_obj.child[1].name, node_obj.child[1].lineno))
+                    self.error_msg(node_obj.child[1], "Semantic error", "Variable",
+                                   "already been declared")
             elif len(node_obj.child) is 6:  # varDeclaration | typeSpecifier ID LBRACKET NUM RBRACKET SEMI
                 if st_lookup(node_obj.child[1].name, self.scope) is None:
                     # not yet in table, so treat as new definition
-                    st_insert(node_obj.child[1].name, self.location, 'arr',
-                              node_obj.attr.basic_type.value, node_obj.child[3].name, self.scope,
+                    st_insert(node_obj.child[1].name, self.location, NodeKind.VAR_K,
+                              node_obj.basic_type, node_obj.child[3].name, self.scope,
                               node_obj.child[1].lineno)
                     self.location = self.location + 1
                 else:
-                    self.error = True
-                    print("Semantic error\n'%s' at line %d has been already declared"
-                          % (node_obj.child[1].name, node_obj.child[1].lineno))
+                    self.error_msg(node_obj.child[1], "Semantic error", "Variable",
+                                   "already been declared")
 
         # funDeclaration
-        elif node_obj.attr.node_kind is NodeAttr.DeclareKind.FunDeclareK:
+        elif node_obj.node_kind is NodeKind.FUN_DECLARE_K:
             if len(node_obj.child) is 6:  # funDeclaration : typeSpecifier ID LPAREN params RPAREN compoundStmt
                 if st_lookup(node_obj.child[1].name, self.scope) is None:  # ID
                     # not yet in table, so treat as new definition
-                    st_insert(node_obj.child[1].name, self.location, 'func',
-                              node_obj.attr.basic_type.value, 1, self.scope,
+                    st_insert(node_obj.child[1].name, self.location, NodeKind.FUNC_K,
+                              node_obj.basic_type, 1, self.scope,
                               node_obj.child[1].lineno)
                     self.location = self.location + 1
                 else:
-                    self.error = True
-                    print("Semantic error\n'%s' at line %d has been already declared"
-                          % (node_obj.child[1].name, node_obj.child[1].lineno))
+                    self.error_msg(node_obj.child[1], "Semantic error", "Function",
+                                   "already been declared")
 
-        # if node_obj.attr is not None:
-        #     if node_obj.attr.kind is StmtKind.ASSIGN_K:  # expression : var ASSIGN expression
-        #         if st_lookup(node_obj.child[0].child[0].name, self.scope) is None:  # expression -> var -> ID
-        #             # not yet in table, so treat as new definition
-        #             print("AssignK if ", node_obj.child[0].child[0].name, node_obj.child[0].child[0].lineno)
-        #             st_insert(node_obj.child[0].child[0].name, self.location, "int", 1, self.scope,
-        #                       node_obj.child[0].child[0].lineno)
-        #             self.location = self.location + 1
-        #         else:
-        #             # already in table, so ignore location, add line number of use only
-        #             print("AssignK else ", node_obj.child[0].child[0].name, node_obj.child[0].child[0].lineno)
-        #             st_insert(node_obj.child[0].child[0].name, 0, "int", 1, self.scope,
-        #                       node_obj.child[0].child[0].lineno)
-        #     elif node_obj.attr.kind is ExpKind.ID_K:  # factor : var
-        #         if st_lookup(node_obj.child[0].child[0].name, self.scope) is None:  # factor -> var -> ID
-        #             # not yet in table, so treat as new definition
-        #             print("IDK if ", node_obj.child[0].child[0].name, node_obj.child[0].child[0].lineno)
-        #             st_insert(node_obj.child[0].child[0].name, self.location, "int", 1, self.scope,
-        #                       node_obj.child[0].child[0].lineno)
-        #             self.location = self.location + 1
-        #         else:
-        #             # already in table, so ignore location, add line number of use only
-        #             print("IDK else ", node_obj.child[0].child[0].name, node_obj.child[0].child[0].lineno)
-        #             st_insert(node_obj.child[0].child[0].name, 0, "int", 1, self.scope,
-        #                       node_obj.child[0].child[0].lineno)
+        # call
+        elif node_obj.node_kind is NodeKind.CALL_K:
+            link_node = st_lookup(node_obj.child[0].name, self.scope)  # call : ID LPAREN args RPAREN
+            if link_node is None:
+                self.error_msg(node_obj.child[0], "Semantic error", "Function",
+                               "using before declared")
+            else:
+                if link_node.id_kind is NodeKind.FUNC_K:  # 确定被调用函数的返回类型
+                    node_obj.basic_type = link_node.basic_type
+                    # already in table, so ignore location, add line number of use only
+                    st_insert(link_node.name, 0, link_node.id_kind, link_node.basic_type,
+                              1, self.scope, node_obj.child[0].lineno)
+                else:
+                    self.error_msg(node_obj.child[0], "Semantic error", "Function",
+                                   "not a function")
+
+        # input
+        elif node_obj.node_kind is NodeKind.INPUT_K:
+            print('', end='')  # call : INPUT LPAREN args RPAREN
 
     def build_symbol_table(self, syntax_tree_node_obj):
         """
@@ -147,11 +133,20 @@ class MySemanticAnalyzer:
         """
         self.traverse(syntax_tree_node_obj, self.insert_node, self.null_proc)
         if self.trace_analyze:
-            print("\nSymbol table:\n\n", end="")
+            print("\nSymbol table:\n")
             print_symbol_table()
 
-    def type_error(self, node_obj, msg):
-        print("Type error at line %d: %s\n" % (node_obj.lineno, msg), end="")
+    def error_msg(self, node_obj, title, guide, msg):
+        """
+        输出错误信息，并将error属性赋值为True
+
+        :param node_obj: 语法树节点对象
+        :param title: 标题
+        :param guide: 节点名前的小标题
+        :param msg: 具体内容
+        :return:
+        """
+        print("%s\n%s '%s' at line %d: %s" % (title, guide, node_obj.name, node_obj.lineno, msg))
         self.error = True
 
     def get_return_stmt_from_statement(self, statement):
@@ -165,17 +160,17 @@ class MySemanticAnalyzer:
         if statement is None:
             return None
 
-        if statement.attr.kind is NodeAttr.StmtKind.COMPOUND_K:
+        if statement.node_kind is NodeKind.COMPOUND_K:
             return_stmt = self.get_return_stmt_from_compound_stmt(statement)
-        elif statement.attr.kind is NodeAttr.StmtKind.SELECTION_K:
+        elif statement.node_kind is NodeKind.SELECTION_K:
             if len(statement.child) is 7 and statement.child[6] is not None:  # 寻找else中的returnStmt
                 # selectionStmt | IF LPAREN expression RPAREN statement ELSE statement
                 return_stmt = self.get_return_stmt_from_statement(statement.child[6])
-        # elif statement.attr.kind is NodeAttr.StmtKind.ITERATION_K:
+        # elif statement.node_kind is NodeKind.ITERATION_K:
         #     # iterationStmt : WHILE LPAREN expression RPAREN statement
         #     if len(statement.child) is 5 and statement.child[4] is not None:
         #         return_stmt = self.get_return_stmt_from_statement(statement.child[4])
-        elif statement.attr.kind is NodeAttr.StmtKind.RETURN_K:
+        elif statement.node_kind is NodeKind.RETURN_K:
             return_stmt = statement
 
         return return_stmt
@@ -209,27 +204,43 @@ class MySemanticAnalyzer:
         :param node_obj:
         :return:
         """
-        if node_obj is None or node_obj.attr is None:
+        if node_obj is None:
             return
 
-        # if node_obj.name == "simpleExpression":
-        #     if len(node_obj.child) is 3:  # simpleExpression -> additiveExpression relop additiveExpression
-        #         if node_obj.child[0].name is
-        #     elif len(node_obj.child) is 1:  # simpleExpression -> additiveExpression
+        # varDeclaration
+        if node_obj.node_kind is NodeKind.VAR_DECLARE_K:
+            # 变量声明不能为void类型
+            type_specifier = node_obj.child[0]  # varDeclaration : typeSpecifier...
+            if type_specifier is not None and type_specifier.basic_type is BasicType.VOID:
+                self.error_msg(node_obj.child[1], "Type error", "Variable",
+                               "not allowed to declared as '%s' type" % type_specifier.basic_type.value)
 
         # funDeclaration
-        if node_obj.attr.node_kind is NodeAttr.DeclareKind.FunDeclareK:
-            # 是否有返回值并确认类型
-            basic_type = node_obj.attr.basic_type
-            if basic_type is not NodeAttr.BasicType.VOID:  # 如果返回类型不为void，则进行检查
-                compound_stmt = node_obj.child[5]  # funDeclaration : typeSpecifier ID LPAREN params RPAREN compoundStmt
-                return_stmt = self.get_return_stmt_from_compound_stmt(compound_stmt)
-                if not (return_stmt
-                        and return_stmt.attr and return_stmt.attr.kind is NodeAttr.StmtKind.RETURN_K
-                        and return_stmt.attr.basic_type is basic_type):
-                    print("Semantic error\nFunction '%s' at line %d needs to return a '%s' value"
-                          % (node_obj.child[1].name, node_obj.child[1].lineno, basic_type.value))
-                    self.error = True
+        elif node_obj.node_kind is NodeKind.FUN_DECLARE_K:
+            # 函数声明是否有返回值并检查返回值类型
+            basic_type = node_obj.basic_type
+            # 返回类型为void和int都要进行检查
+            compound_stmt = node_obj.child[5]  # funDeclaration : typeSpecifier ID LPAREN params RPAREN compoundStmt
+            return_stmt = self.get_return_stmt_from_compound_stmt(compound_stmt)
+            if return_stmt is None:  # 没有返回值，且函数声明的返回类型不为void，输出错误信息
+                if basic_type is not BasicType.VOID:
+                    self.error_msg(node_obj.child[1], "Semantic error", "Function",
+                                   "need to return a '%s' value" % basic_type.value)
+            else:  # 有返回值，且函数声明的返回类型与返回值的类型不同，输出错误信息
+                if not (return_stmt.node_kind is NodeKind.RETURN_K
+                        and return_stmt.child[1].basic_type is basic_type):
+                    self.error_msg(node_obj.child[1], "Semantic error", "Function",
+                                   "need to return a '%s' value" % basic_type.value)
+
+        # selectionStmt
+        elif node_obj.node_kind is (NodeKind.SELECTION_K or NodeKind.ITERATION_K):
+            # 检查if和while语句中的表达式类型
+            if not (node_obj.child[2].basic_type is BasicType.BOOL or BasicType.INT):
+                # selectionStmt : IF LPAREN expression RPAREN...
+                # iterationStmt : WHILE LPAREN expression RPAREN statement
+                self.error_msg(node_obj.child[0], "Type error", "Statement",
+                               "can not receive expression which returns a '%s' value"
+                               % node_obj.child[2].basic_type.value)
 
     def type_check(self, syntax_tree_node_obj):
         """
@@ -253,7 +264,6 @@ if __name__ == '__main__':
         /* A program to perform Euclid's
            Algorithm to compute gcd. */
         int a[20];
-        int a[1];
         
         int gcd (int u, int v)
         {   if (v == 0)return u;
@@ -266,9 +276,11 @@ if __name__ == '__main__':
         
         int abc (int u, int v)
         {   
+            if(x){}
             while(x < 1){
                 return 0;
             }
+            return 0;
         }
         
         void main() {
@@ -302,5 +314,6 @@ if __name__ == '__main__':
     # root_node.print()
 
     my_semantic_analyzer = MySemanticAnalyzer()
-    # my_semantic_analyzer.build_symbol_table(root_node)
+    my_semantic_analyzer.build_symbol_table(root_node)
     my_semantic_analyzer.type_check(root_node)
+    # print_symbol_table()

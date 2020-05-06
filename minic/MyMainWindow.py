@@ -384,14 +384,11 @@ class MyMainWindow(QMainWindow):
         """
         tree_widget_item = QTreeWidgetItem()
         tree_widget_item.setText(0, str(node_obj.name))
-        if not node_obj.child and not node_obj.sibling:  # child、sibling为空或None即为叶子
+        if not node_obj.child:  # child为空或None即为叶子
             tree_widget_item.setBackground(0, QBrush(QColor("#90EE90")))
 
         for obj in node_obj.child:
             tree_widget_item.addChild(self.dump(obj))
-
-        if node_obj.sibling is not None:
-            tree_widget_item.addChild(self.dump(node_obj.sibling))
 
         return tree_widget_item
 

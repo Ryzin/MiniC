@@ -12,51 +12,56 @@
 from enum import Enum
 
 
-class NodeAttr(object):  # 在语法分析时确定
-    node_kind = None  # 值可以为NodeKind中的枚举类型，在代码生成时使用该属性
-    basic_type = None
-    kind = None  # 值可以为StmtKind或ExpKind中的枚举类型，在语义分析时使用该属性
-
-    def __init__(self, node_kind=None, basic_type=None, kind=None):
-        self.node_kind = node_kind
-        self.basic_type = basic_type
-        self.kind = kind
-
-    # class NodeKind(Enum):
-    #     StmtK = 'StmtK'
-    #     ExpK = 'ExpK'
-
-    class BasicType(Enum):
-        VOID = 'void'
-        INT = 'int'
-
-    class DeclareKind(Enum):
-        FunDeclareK = 'FunDeclareK'
-        VarDeclareK = 'VarDeclareK'
-
-    class ExpKind(Enum):
-        OP_K = 'OpK'
-        CONST_K = 'ConstK'
-        ID_K = 'IdK'
-        ARRAY_K = 'ArrayK'
-
-    class StmtKind(Enum):
-        EXP_K = 'ExpK'
-        COMPOUND_K = 'CompoundK'
-        SELECTION_K = 'SelectionK'
-        ITERATION_K = 'IterationK'
-        RETURN_K = 'ReturnK'
-        OUTPUT_K = 'OutputK'
-
-        ASSIGN_K = 'AssignK'
-
-# class TokenAttr(object):  # 在语义分析时确定
-#     exp_type = None  # ExpType 在代码生成时使用该属性
+# class NodeAttr(object):  # 在语法分析时确定
+#     # node_kind = None  # 值可以为NodeKind中的枚举类型，在代码生成时使用该属性
+#     basic_type = None
+#     kind = None  # 值可以为StmtKind或ExpKind中的枚举类型，在语义分析时使用该属性
 #
-#     def __init__(self, exp_type):
-#         self.exp_type = exp_type
+#     def __init__(self, basic_type=None, kind=None):
+#         self.basic_type = basic_type
+#         self.kind = kind
+#
+#     # def __init__(self, node_kind=None, basic_type=None, kind=None):
+#     #     self.node_kind = node_kind
+#     #     self.basic_type = basic_type
+#     #     self.kind = kind
+#
+#     # class NodeKind(Enum):
+#     #     StmtK = 'StmtK'
+#     #     ExpK = 'ExpK'
+
+class NodeKind(Enum):
+    # declaration kind
+    FUN_DECLARE_K = 'FunDeclareK'
+    VAR_DECLARE_K = 'VarDeclareK'
+
+    # token kind:
+    VAR_K = 'var'
+    FUNC_K = 'func'
+    RELOP_K = 'relop'
+    ARIOP_K = 'ariop'
+    NUM_K = 'num'
+
+    # expression kind
+    ASSIGN_K = 'AssignK'
+    COMPARE_K = 'CompareK'
+    CALL_K = 'CallK'
+    INPUT_K = 'InputK'
+
+    # statement kind
+    EXP_K = 'ExpK'
+    COMPOUND_K = 'CompoundK'
+    SELECTION_K = 'SelectionK'
+    ITERATION_K = 'IterationK'
+    RETURN_K = 'ReturnK'
+    OUTPUT_K = 'OutputK'
 
 
+class BasicType(Enum):
+    VOID = 'void'
+    INT = 'int'
+    ARRAY = 'arr'
+    BOOL = 'bool'
 
 
 class MyTreeNode(object):
@@ -66,22 +71,23 @@ class MyTreeNode(object):
 
     Attributes:
         name: 当前节点名
-        sibling: 兄弟节点对象
         child: 保存子节点对象的列表
     """
 
     name = None  # 便于打印语法树
     child = None  # 以列表形式存储，便于顺序遍历
-    sibling = None  # 以链表形式存储各个statement节点树根，而不是存储到child，是因为不能确定statement的数量
     lineno = None  # 便于构建符号表
-    attr = None
+    node_kind = None  # 用于判断节点类型
+    basic_type = None  # 用于判断返回值类型或者变量的类型
 
-    def __init__(self, node_name):
+    def __init__(self, node_name, node_kind=None, basic_type=None):
         """类的构造函数"""
         super(MyTreeNode, self).__init__()
         self.name = node_name
         self.child = []
-        self.attr = None
+        self.lineno = None
+        self.node_kind = node_kind
+        self.basic_type = basic_type
 
     def __repr__(self):
         """将对象转化为对象的string格式"""
@@ -113,9 +119,6 @@ class MyTreeNode(object):
         for node_obj in self.child:
             node_obj.traverse(indent + 1)
 
-        if self.sibling is not None:
-            self.sibling.traverse(indent + 1)
-
 
 # 测试
 if __name__ == '__main__':
@@ -125,19 +128,8 @@ if __name__ == '__main__':
     child_a2 = MyTreeNode('a2')
     child_a2.child.append(MyTreeNode('b3'))
     child_a2.child.append(MyTreeNode('c1'))
-    sibling_d1 = MyTreeNode('d1')
-    sibling_d2 = MyTreeNode('d2')
-    sibling_d3 = MyTreeNode('d3')
-    sibling_d4 = MyTreeNode('d4')
-    sibling_d5 = MyTreeNode('d5')
-    sibling_d6 = MyTreeNode('d6')
-    sibling_d1.sibling = sibling_d2
-    sibling_d2.sibling = sibling_d3
-    sibling_d3.sibling = sibling_d4
-    sibling_d4.sibling = sibling_d5
-    child_a2.sibling = sibling_d1
+
     root = MyTreeNode('root')  # root name is 'root'
-    root.sibling = sibling_d6
     root.child.append(child_a1)
     root.child.append(child_a2)
 
@@ -149,9 +141,3 @@ if __name__ == '__main__':
     # | - a2
     #     | - b3
     #     | - c1
-    #     | - d1
-    #         | - d2
-    #             | - d3
-    #                 | - d4
-    #                     | - d5
-    # | - d6

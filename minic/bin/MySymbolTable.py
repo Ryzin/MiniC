@@ -32,7 +32,8 @@ class Bucket(object):
     name = None
     lines = None
     mem_loc = None
-    type = None  # int\func\arr(指针，其引用的memloc与原指针memloc相同)
+    id_kind = None  # var\func\arr(指针，其引用的memloc与原指针memloc相同)
+    basic_type = None  # int\void
     size = None  # 数组大小\函数参数个数（函数参数作为对应作用域的新标识符）
     scope = None  # 作用域，作用域大的标识符可以访问作用域小的标识符
     next = None
@@ -68,7 +69,7 @@ def hash_name(key, scope):
     return temp
 
 
-def st_insert(name, loc, type, size, scope, lineno):
+def st_insert(name, loc, id_kind, basic_type, size, scope, lineno):
     """
     Procedure st_insert inserts line numbers and memory locations
     into the symbol table loc = memory location is inserted only the
@@ -83,13 +84,14 @@ def st_insert(name, loc, type, size, scope, lineno):
     l = hash_table[h]
     while l is not None and name is not l.name:
         l = l.next
-    if l is None:  # variable not yet in table
+    if l is None or l is not None and l.scope < scope:  # variable not yet in table
         l = Bucket()
         l.name = name
         l.lines = Line()
         l.lines.lineno = lineno
         l.mem_loc = loc
-        l.type = type
+        l.id_kind = id_kind
+        l.basic_type = basic_type
         l.size = size
         l.scope = scope
         l.lines.next = None
@@ -123,8 +125,8 @@ def st_lookup(name, scope):  # TODO 应优先查找作用域大的标识符（�
 
 
 def print_symbol_table():
-    print("Variable Name  Location  type  size  scope    Line Numbers")
-    print("-------------  --------  ----  ----  -----    ------------")
+    print("Variable Name  Location  Id Kind  Basic Type  Size  Scope    Line Numbers")
+    print("-------------  --------  -------  ----------  ----  -----    ------------")
     for i in range(0, size):
         if hash_table[i] is not None:
             l = hash_table[i]
@@ -132,7 +134,8 @@ def print_symbol_table():
                 t = l.lines
                 print("%13s " % l.name, end="")
                 print("%9d" % l.mem_loc, end="")
-                print("%6s" % l.type, end="")
+                print("%9s" % l.id_kind, end="")
+                print("%12s" % l.basic_type, end="")
                 print("%6d" % l.size, end="")
                 print("%7d" % l.scope, end="")
                 while t is not None:
@@ -149,13 +152,13 @@ if __name__ == '__main__':
     for i in range(0, 2):
         print(hash_name("HelloWorld", i))
 
-    # Variable Name  Location  type  size  scope    Line Numbers
-    # -------------  --------  ----  ----  -----    ------------
-    st_insert("input", 1, 'func', 0, 1, 1)
-    st_insert("output", 2, 'func', 1, 1, 1)
-    st_insert("x", 3, 'int', 1, 1, 1)
-    st_insert("HelloWorld", 4, 'int', 1, 1, 24)
-    st_insert("HelloWorld", 0, 'int', 1, 1, 25)
-    st_insert("HelloWorld", 0, 'int', 1, 1, 26)
-    st_insert("Test", 4, 'arr', 4, 1, 25)
+    # print("Variable Name  Location  Id Kind  Basic Type  Size  Scope    Line Numbers")
+    # print("-------------  --------  -------  ----------  ----  -----    ------------")
+    st_insert("input", 1, 'func', 'int', 0, 1, 1)
+    st_insert("output", 2, 'func', 'void', 1, 1, 1)
+    st_insert("x", 3, 'var', 'int', 1, 1, 1)
+    st_insert("HelloWorld", 4, 'var', 'int', 1, 1, 24)
+    st_insert("HelloWorld", 0, 'var', 'int', 1, 1, 25)
+    st_insert("HelloWorld", 0, 'var', 'int', 1, 1, 26)
+    st_insert("Test", 4, 'arr', 'int', 4, 1, 25)
     print_symbol_table()

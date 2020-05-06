@@ -14,15 +14,25 @@ from enum import Enum
 
 class NodeAttr(object):  # 在语法分析时确定
     node_kind = None  # 值可以为NodeKind中的枚举类型，在代码生成时使用该属性
+    basic_type = None
     kind = None  # 值可以为StmtKind或ExpKind中的枚举类型，在语义分析时使用该属性
 
-    def __init__(self, node_kind, kind):
+    def __init__(self, node_kind=None, basic_type=None, kind=None):
         self.node_kind = node_kind
+        self.basic_type = basic_type
         self.kind = kind
 
-    class NodeKind(Enum):
-        StmtK = 'StmtK'
-        ExpK = 'ExpK'
+    # class NodeKind(Enum):
+    #     StmtK = 'StmtK'
+    #     ExpK = 'ExpK'
+
+    class BasicType(Enum):
+        VOID = 'void'
+        INT = 'int'
+
+    class DeclareKind(Enum):
+        FunDeclareK = 'FunDeclareK'
+        VarDeclareK = 'VarDeclareK'
 
     class ExpKind(Enum):
         OP_K = 'OpK'
@@ -31,21 +41,22 @@ class NodeAttr(object):  # 在语法分析时确定
         ARRAY_K = 'ArrayK'
 
     class StmtKind(Enum):
-        IF_K = 'IfK'
+        EXP_K = 'ExpK'
+        COMPOUND_K = 'CompoundK'
+        SELECTION_K = 'SelectionK'
         ITERATION_K = 'IterationK'
+        RETURN_K = 'ReturnK'
+        OUTPUT_K = 'OutputK'
+
         ASSIGN_K = 'AssignK'
-        RETURN_K = 'Return_K'
+
+# class TokenAttr(object):  # 在语义分析时确定
+#     exp_type = None  # ExpType 在代码生成时使用该属性
+#
+#     def __init__(self, exp_type):
+#         self.exp_type = exp_type
 
 
-class TokenAttr(object):  # 在语义分析时确定
-    exp_type = None  # ExpType 在代码生成时使用该属性
-
-    def __init__(self, exp_type):
-        self.exp_type = exp_type
-
-    class ExpType(Enum):
-        VOID = 'void'
-        INT = 'int'
 
 
 class MyTreeNode(object):
@@ -70,7 +81,7 @@ class MyTreeNode(object):
         super(MyTreeNode, self).__init__()
         self.name = node_name
         self.child = []
-        self.attr = TokenAttr(TokenAttr.ExpType.INT)
+        self.attr = None
 
     def __repr__(self):
         """将对象转化为对象的string格式"""

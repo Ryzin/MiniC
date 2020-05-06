@@ -14,14 +14,11 @@ import logging
 import ply.yacc as yacc
 
 # main.py required
-from .MyLexer import tokens, MyLexer
-from .MyTreeNode import MyTreeNode, NodeAttr
+# from .MyLexer import tokens, MyLexer
+# from .MyTreeNode import MyTreeNode, NodeAttr
 
-# from MyLexer import tokens, MyLexer
-# from MyTreeNode import MyTreeNode, NodeAttr
-
-# location = 0
-# symbol_table = MySymbolTable()
+from MyLexer import tokens, MyLexer
+from MyTreeNode import MyTreeNode, NodeAttr
 
 
 # TODO 检查声明是否有保留字
@@ -85,7 +82,9 @@ def MyParser(tree_type="NST"):
                            | typeSpecifier ID LBRACKET NUM RBRACKET SEMI
         """
         if tree_type is "AST":
-            normal_syntax_tree(p, 'varDeclaration')
+            basic_type = NodeAttr.BasicType.INT if p[1].name is 'int' else NodeAttr.BasicType.VOID
+            attr = NodeAttr(node_kind=NodeAttr.DeclareKind.VarDeclareK, basic_type=basic_type)
+            normal_syntax_tree(p, 'varDeclaration', attr)
         else:  # NST
             normal_syntax_tree(p, 'varDeclaration')
 
@@ -104,7 +103,10 @@ def MyParser(tree_type="NST"):
             funDeclaration : typeSpecifier ID LPAREN params RPAREN compoundStmt
         """
         if tree_type is "AST":
-            normal_syntax_tree(p, 'funDeclaration')
+            basic_type = NodeAttr.BasicType.INT if p[1].name == 'int' else NodeAttr.BasicType.VOID
+            attr = NodeAttr(node_kind=NodeAttr.DeclareKind.FunDeclareK, basic_type=basic_type)
+            normal_syntax_tree(p, 'funDeclaration', attr)
+            # p[0].child.extend(p[6].child)  # 将p[6]孩子列表中元素添加到p[0]的孩子列表中，丢弃p[6]
         else:  # NST
             normal_syntax_tree(p, 'funDeclaration')
 
@@ -153,7 +155,8 @@ def MyParser(tree_type="NST"):
             compoundStmt : LBRACE localDeclarations statementList RBRACE
         """
         if tree_type is "AST":
-            normal_syntax_tree(p, 'compoundStmt')
+            attr = NodeAttr(kind=NodeAttr.StmtKind.COMPOUND_K)
+            normal_syntax_tree(p, 'compoundStmt', attr)
         else:  # NST
             normal_syntax_tree(p, 'compoundStmt')
 
@@ -182,19 +185,30 @@ def MyParser(tree_type="NST"):
         # 修改语法规则为右递归
         if tree_type is "AST":
             if len(p) is 3:
+                # 使用sibling属性保存节点
                 # statementList -> statement -> statementList ->
+                # p[0] = MyTreeNode('statementList')
+                # p[1].lineno = p.lineno(1)
+                # p[0].sibling = p[1]
+                # if p[2] is not None:
+                #     p[2].lineno = p.lineno(2)
+                #     p[1].sibling = p[2]
+
+                # 使用child属性保存节点
                 p[0] = MyTreeNode('statementList')
-                p[1].lineno = p.lineno(1)
-                p[0].sibling = p[1]
+                p[0].add_child(p[1])
                 if p[2] is not None:
-                    p[2].lineno = p.lineno(2)
-                    p[1].sibling = p[2]
+                    p[0].child.extend(p[2].child)
         else:  # NST
+            # 使用sibling属性保存节点
             p[0] = MyTreeNode('statementList')
             if len(p) is 3:
                 for i in range(0, len(p) - 1):  # statementList -> statement -> statementList ->
                     p[i + 1].lineno = p.lineno(i)
                     p[i].sibling = p[i + 1]
+
+            # 使用child属性保存节点
+            # normal_syntax_tree(p, 'statementList')
 
     def p_statement(p):
         """
@@ -218,7 +232,8 @@ def MyParser(tree_type="NST"):
         """
         if tree_type is "AST":
             if len(p) is 3:
-                normal_syntax_tree(p, 'expressionStmt')
+                attr = NodeAttr(kind=NodeAttr.StmtKind.EXP_K)
+                normal_syntax_tree(p, 'expressionStmt', attr)
             else:
                 p[0] = MyTreeNode(p[1])
         else:  # NST
@@ -230,7 +245,8 @@ def MyParser(tree_type="NST"):
                           | IF LPAREN expression RPAREN statement ELSE statement
         """
         if tree_type is "AST":
-            normal_syntax_tree(p, 'selectionStmt')
+            attr = NodeAttr(kind=NodeAttr.StmtKind.SELECTION_K)
+            normal_syntax_tree(p, 'selectionStmt', attr)
         else:  # NST
             normal_syntax_tree(p, 'selectionStmt')
 
@@ -239,7 +255,8 @@ def MyParser(tree_type="NST"):
             iterationStmt : WHILE LPAREN expression RPAREN statement
         """
         if tree_type is "AST":
-            normal_syntax_tree(p, 'iterationStmt')
+            attr = NodeAttr(kind=NodeAttr.StmtKind.ITERATION_K)
+            normal_syntax_tree(p, 'iterationStmt', attr)
         else:  # NST
             normal_syntax_tree(p, 'iterationStmt')
 
@@ -249,7 +266,13 @@ def MyParser(tree_type="NST"):
                        | RETURN expression SEMI
         """
         if tree_type is "AST":
-            normal_syntax_tree(p, 'returnStmt')
+            attr = None
+            if len(p) is 3:
+                attr = NodeAttr(basic_type=NodeAttr.BasicType.VOID, kind=NodeAttr.StmtKind.RETURN_K)
+            elif len(p) is 4:
+                # TODO expression basic type
+                attr = NodeAttr(basic_type=NodeAttr.BasicType.INT, kind=NodeAttr.StmtKind.RETURN_K)
+            normal_syntax_tree(p, 'returnStmt', attr)
         else:  # NST
             normal_syntax_tree(p, 'returnStmt')
 
@@ -258,7 +281,8 @@ def MyParser(tree_type="NST"):
             outputStmt : OUTPUT LPAREN expression RPAREN SEMI
         """
         if tree_type is "AST":
-            normal_syntax_tree(p, 'outputStmt')
+            attr = NodeAttr(kind=NodeAttr.StmtKind.OUTPUT_K)
+            normal_syntax_tree(p, 'outputStmt', attr)
         else:  # NST
             normal_syntax_tree(p, 'outputStmt')
 
@@ -266,9 +290,7 @@ def MyParser(tree_type="NST"):
         """
             expression : var ASSIGN expression
                        | simpleExpression
-                       | inputExpression
         """
-        # 增加inputExpression
         if tree_type is "AST":
             if len(p) is 4:
                 # 虽然是右递归，但是需要expression作为父节点，所以不向p[0]追加孩子
@@ -284,10 +306,7 @@ def MyParser(tree_type="NST"):
                 | ID LBRACKET expression RBRACKET
         """
         if tree_type is "AST":
-            if len(p) is 5:
-                normal_syntax_tree(p, 'var')
-            else:
-                p[0] = MyTreeNode(p[1])
+            normal_syntax_tree(p, 'var')
         else:  # NST
             normal_syntax_tree(p, 'var')
 
@@ -303,16 +322,6 @@ def MyParser(tree_type="NST"):
                 p[0] = p[1]
         else:  # NST
             normal_syntax_tree(p, 'simpleExpression')
-
-    def p_input_expression(p):
-        """
-            inputExpression : INPUT LPAREN VOID RPAREN
-                            | INPUT LPAREN RPAREN
-        """
-        if tree_type is "AST":
-            normal_syntax_tree(p, 'inputExpression')
-        else:  # NST
-            normal_syntax_tree(p, 'inputExpression')
 
     def p_relop(p):
         """
@@ -336,7 +345,10 @@ def MyParser(tree_type="NST"):
         if tree_type is "AST":
             if len(p) is 4:
                 p[0] = MyTreeNode('additiveExpression')
-                p[0].child.extend(p[1].child)  # 将p[1]孩子列表中元素添加到p[0]的孩子列表中，丢弃p[1]
+                if p[1].name is 'additiveExpression':
+                    p[0].child.extend(p[1].child)  # 将p[1]孩子列表中元素添加到p[0]的孩子列表中，丢弃p[1]
+                else:
+                    p[0].add_child(p[1])
                 p[0].add_child(p[2])
                 p[0].add_child(p[3])
             else:
@@ -362,7 +374,10 @@ def MyParser(tree_type="NST"):
         if tree_type is "AST":
             if len(p) is 4:
                 p[0] = MyTreeNode('term')
-                p[0].child.extend(p[1].child)  # 将p[1]孩子列表中元素添加到p[0]的孩子列表中，丢弃p[1]
+                if p[1].name is 'term':
+                    p[0].child.extend(p[1].child)  # 将p[1]孩子列表中元素添加到p[0]的孩子列表中，丢弃p[1]
+                else:
+                    p[0].add_child(p[1])
                 p[0].add_child(p[2])
                 p[0].add_child(p[3])
             else:
@@ -388,11 +403,11 @@ def MyParser(tree_type="NST"):
                    | NUM
         """
         if tree_type is "AST":
-            if len(p) is 4:
+            if len(p) is 4:  # factor需要确定并保存expression的类型（是否为int）
                 normal_syntax_tree(p, 'factor')
-            elif isinstance(p[1], MyTreeNode):
+            elif isinstance(p[1], MyTreeNode):  # var or call
                 p[0] = p[1]
-            else:
+            else:  # num
                 p[0] = MyTreeNode(p[1])
         else:  # NST
             normal_syntax_tree(p, 'factor')
@@ -415,7 +430,9 @@ def MyParser(tree_type="NST"):
     def p_call(p):
         """
             call : ID LPAREN args RPAREN
+                 | INPUT LPAREN args RPAREN
         """
+        # 增加input
         if tree_type is "AST":
             normal_syntax_tree(p, 'call')
         else:  # NST
@@ -424,11 +441,16 @@ def MyParser(tree_type="NST"):
     def p_args(p):
         """
             args : argList
+                 | VOID
                  | empty
         """
+        # 增加void
         if tree_type is "AST":
             if len(p) is 2:
-                p[0] = p[1]
+                if isinstance(p[1], MyTreeNode):  # argList
+                    p[0] = p[1]
+                else:  # void
+                    p[0] = MyTreeNode(p[1])
         else:  # NST
             normal_syntax_tree(p, 'args')
 
@@ -444,7 +466,8 @@ def MyParser(tree_type="NST"):
                 p[0].add_child(p[2])
                 p[0].add_child(p[3])
             else:
-                p[0] = p[1]
+                p[0] = MyTreeNode('argList')
+                p[0].add_child(p[1])  # 保持expression节点始终为孩子
         else:  # NST
             normal_syntax_tree(p, 'argList')
 
@@ -462,16 +485,18 @@ def MyParser(tree_type="NST"):
         else:
             print("Syntax missing EOF")
 
-    def normal_syntax_tree(p, name):
+    def normal_syntax_tree(p, name, attr=None):
         """
 
         生成普通语法树NST节点的方法（与之对应的是抽象语法树AST）
 
+        :param attr:
         :param p: p的引用
         :param name: 当前节点名
         :return:
         """
         p[0] = MyTreeNode(name)
+        p[0].attr = attr
         for i in range(1, len(p)):
             p[0].add_child(p[i])
             p[0].child[i - 1].lineno = p.lineno(i)
@@ -581,4 +606,4 @@ if __name__ == '__main__':
     # parser.parse() 返回起始规则的p[0]
 
     # 控制台输出语法分析树
-    root_node.print()
+    # root_node.print()

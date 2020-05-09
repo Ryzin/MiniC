@@ -12,7 +12,7 @@
 # main.py required
 from MyLexer import tokens, MyLexer
 from MyParser import MyParser
-from MySymbolTable import hash_table, st_lookup, st_insert, print_symbol_table
+from MySymbolTable import get_scope, st_lookup, st_insert, print_scope
 from MyTreeNode import NodeKind, BasicType
 
 # 2. （本条待再次确认）函数声明和定义间没有区别（即没有声明只有定义），使用前必须声明，进行函数名
@@ -25,19 +25,17 @@ from MyTreeNode import NodeKind, BasicType
 
 class MySemanticAnalyzer:
     trace_analyze = False
-    location = 0  # counter for variable memory locations
-    scope = 0  # 当前作用域大小，作用域大的标识符可以访问作用域小的标识符
+    location = 0  # 变量内存位置计数器
+    scope_id = 10000000  # 作用域id计数器
+    current_scope = get_scope(scope_id, 0)  # 当前作用域
     error = False  # 错误标志
 
     def traverse(self, node_obj, pre_proc, post_proc):
-        """
-        Procedure traverse is a generic recursive syntax tree traversal routine:
-        it applies preProc in preorder and postProc in postorder to tree pointed
-        to by t
+        """通用前后序遍历
 
-        :param node_obj:
-        :param pre_proc:
-        :param post_proc:
+        :param node_obj: 当前语法树节点引用
+        :param pre_proc: 前序遍历操作函数参数
+        :param post_proc: 后序遍历操作函数参数
         :return:
         """
         if node_obj is not None:
@@ -48,97 +46,17 @@ class MySemanticAnalyzer:
             # self.traverse(node_obj.sibling, pre_proc, post_proc)
 
     def null_proc(self, node_obj):
-        """
-        nullProc is a do-nothing procedure to generate preorder-only or
-        postorder-only traversals from traverse
+        """不执行任何操作
 
         :param node_obj:
         :return:
         """
         pass
 
-    def insert_node(self, node_obj):
-        """
-        Procedure insertNode inserts identifiers stored in t into
-        the symbol table
-
-        :param node_obj:
-        :return:
-        """
-        if node_obj is None:
-            return
-
-        # varDeclaration
-        if node_obj.node_kind is NodeKind.VAR_DECLARE_K:
-            if len(node_obj.child) is 3:  # varDeclaration : typeSpecifier ID SEMI
-                if st_lookup(node_obj.child[1].name, self.scope) is None:  # ID
-                    # not yet in table, so treat as new definition
-                    st_insert(node_obj.child[1].name, self.location, NodeKind.VAR_K,
-                              node_obj.basic_type, 1, self.scope,
-                              node_obj.child[1].lineno)
-                    self.location = self.location + 1
-                else:
-                    self.error_msg(node_obj.child[1], "Semantic error", "Variable",
-                                   "already been declared")
-            elif len(node_obj.child) is 6:  # varDeclaration | typeSpecifier ID LBRACKET NUM RBRACKET SEMI
-                if st_lookup(node_obj.child[1].name, self.scope) is None:
-                    # not yet in table, so treat as new definition
-                    st_insert(node_obj.child[1].name, self.location, NodeKind.VAR_K,
-                              node_obj.basic_type, node_obj.child[3].name, self.scope,
-                              node_obj.child[1].lineno)
-                    self.location = self.location + 1
-                else:
-                    self.error_msg(node_obj.child[1], "Semantic error", "Variable",
-                                   "already been declared")
-
-        # funDeclaration
-        elif node_obj.node_kind is NodeKind.FUN_DECLARE_K:
-            if len(node_obj.child) is 6:  # funDeclaration : typeSpecifier ID LPAREN params RPAREN compoundStmt
-                if st_lookup(node_obj.child[1].name, self.scope) is None:  # ID
-                    # not yet in table, so treat as new definition
-                    st_insert(node_obj.child[1].name, self.location, NodeKind.FUNC_K,
-                              node_obj.basic_type, 1, self.scope,
-                              node_obj.child[1].lineno)
-                    self.location = self.location + 1
-                else:
-                    self.error_msg(node_obj.child[1], "Semantic error", "Function",
-                                   "already been declared")
-
-        # call
-        elif node_obj.node_kind is NodeKind.CALL_K:
-            link_node = st_lookup(node_obj.child[0].name, self.scope)  # call : ID LPAREN args RPAREN
-            if link_node is None:
-                self.error_msg(node_obj.child[0], "Semantic error", "Function",
-                               "using before declared")
-            else:
-                if link_node.id_kind is NodeKind.FUNC_K:  # 确定被调用函数的返回类型
-                    node_obj.basic_type = link_node.basic_type
-                    # already in table, so ignore location, add line number of use only
-                    st_insert(link_node.name, 0, link_node.id_kind, link_node.basic_type,
-                              1, self.scope, node_obj.child[0].lineno)
-                else:
-                    self.error_msg(node_obj.child[0], "Semantic error", "Function",
-                                   "not a function")
-
-        # input
-        elif node_obj.node_kind is NodeKind.INPUT_K:
-            print('', end='')  # call : INPUT LPAREN args RPAREN
-
-    def build_symbol_table(self, syntax_tree_node_obj):
-        """
-        Function buildSymtab constructs the symbol table by preorder traversal of the syntax tree
-
-        :param syntax_tree_node_obj:
-        :return:
-        """
-        self.traverse(syntax_tree_node_obj, self.insert_node, self.null_proc)
-        if self.trace_analyze:
-            print("\nSymbol table:\n")
-            print_symbol_table()
-
     def error_msg(self, node_obj, title, guide, msg):
-        """
-        输出错误信息，并将error属性赋值为True
+        """输出错误信息
+
+        并将error属性赋值为True
 
         :param node_obj: 语法树节点对象
         :param title: 标题
@@ -149,8 +67,107 @@ class MySemanticAnalyzer:
         print("%s\n%s '%s' at line %d: %s" % (title, guide, node_obj.name, node_obj.lineno, msg))
         self.error = True
 
-    def get_return_stmt_from_statement(self, statement):
+    def insert_node(self, node_obj):
+        """符号表插入符号
+
+        通过检查语法树节点，向相应作用域的符号表插入相应符号
+
+        :param node_obj: 语法树节点对象的引用
+        :return:
         """
+        if node_obj is None:
+            return
+
+        # 左花括号
+        if node_obj.node_kind is NodeKind.LBRACE_K:
+            # 两种情况下会创建新的scope：一是提前peek到下一个scope id，如paramList；二是遇到左花括号（不一定创建）
+            self.scope_id = self.scope_id + 1  # 只有在遇到左花括号时，才更新scope_id属性
+            self.current_scope = get_scope(self.scope_id, self.current_scope.level + 1, self.current_scope)
+
+        # 右花括号
+        elif node_obj.node_kind is NodeKind.RBRACE_K:
+            self.current_scope = self.current_scope.enclosing_scope  # 回溯
+
+        # varDeclaration
+        elif node_obj.node_kind is NodeKind.VAR_DECLARE_K:
+            if len(node_obj.child) is 3:  # varDeclaration : typeSpecifier ID SEMI
+                symbol, scope = st_lookup(node_obj.child[1].name, self.current_scope.id)
+                if scope is not self.current_scope:  # 在当前作用域中不存在此声明
+                    # not yet in table, so treat as new definition
+                    st_insert(node_obj.child[1].name, self.location, NodeKind.VAR_K,
+                              node_obj.basic_type, 1, node_obj.child[1].lineno,
+                              self.current_scope.id, self.current_scope.level)
+                    self.location = self.location + 1  # 新节点，需要加1
+                else:
+                    self.error_msg(node_obj.child[1], "Semantic error", "Variable",
+                                   "already been declared")
+            elif len(node_obj.child) is 6:  # varDeclaration | typeSpecifier ID LBRACKET NUM RBRACKET SEMI
+                symbol, scope = st_lookup(node_obj.child[1].name, self.current_scope.id)
+                if scope is not self.current_scope:
+                    # not yet in table, so treat as new definition
+                    st_insert(node_obj.child[1].name, self.location, NodeKind.VAR_K,
+                              node_obj.basic_type, node_obj.child[3].name, node_obj.child[1].lineno,
+                              self.current_scope.id, self.current_scope.level)
+                    self.location = self.location + 1
+                else:
+                    self.error_msg(node_obj.child[1], "Semantic error", "Variable",
+                                   "already been declared")
+
+        # funDeclaration
+        elif node_obj.node_kind is NodeKind.FUN_DECLARE_K:
+            if len(node_obj.child) is 6:  # funDeclaration : typeSpecifier ID LPAREN params RPAREN compoundStmt
+                symbol, scope = st_lookup(node_obj.child[1].name, self.current_scope.id)
+                if scope is not self.current_scope:  # ID
+                    # not yet in table, so treat as new definition
+                    st_insert(node_obj.child[1].name, self.location, NodeKind.FUNC_K,
+                              node_obj.basic_type, 1, node_obj.child[1].lineno,
+                              self.current_scope.id, self.current_scope.level)
+                    self.location = self.location + 1
+
+                    # paramList
+                    param_list = node_obj.child[3]
+                    if param_list is not None:
+                        for cur_child in param_list.child:  # paramList : paramList COMMA param
+                            if cur_child.node_kind is NodeKind.PARAM_K:
+                                # param : typeSpecifier ID | typeSpecifier ID LBRACKET RBRACKET
+                                symbol, scope = st_lookup(cur_child.child[1].name, self.current_scope.id + 1)
+                                if scope is not self.current_scope:
+                                    # not yet in table, so treat as new definition
+                                    tmp_scope_id = self.scope_id + 1  # peek到下一个作用域，作用域id先加1
+                                    st_insert(cur_child.child[1].name, self.location, NodeKind.VAR_K,
+                                              cur_child.basic_type, 1, cur_child.child[1].lineno,
+                                              tmp_scope_id, self.current_scope.level)
+                                    self.location = self.location + 1
+                                else:
+                                    self.error_msg(node_obj.child[1], "Semantic error", "Param",
+                                                   "already been declared")
+                else:
+                    self.error_msg(node_obj.child[1], "Semantic error", "Function",
+                                   "already been declared")
+
+        # call
+        elif node_obj.node_kind is NodeKind.CALL_K:   # call : ID LPAREN args RPAREN
+            symbol, scope = st_lookup(node_obj.child[0].name, self.current_scope.id)
+            if symbol is None:
+                self.error_msg(node_obj.child[0], "Semantic error", "Function",
+                               "using before declared")
+            else:
+                if symbol.id_kind is NodeKind.FUNC_K:  # 确定被调用函数的返回类型
+                    node_obj.basic_type = symbol.basic_type
+                    # already in table, so ignore location, add line number of use only
+                    st_insert(symbol.name, 0, symbol.id_kind, symbol.basic_type,
+                              1, node_obj.child[0].lineno, scope.id, scope.level)
+                else:
+                    self.error_msg(node_obj.child[0], "Semantic error", "Function",
+                                   "not a function")
+
+        # input
+        elif node_obj.node_kind is NodeKind.INPUT_K:
+            print('', end='')  # call : INPUT LPAREN args RPAREN
+
+    def get_return_stmt_from_statement(self, statement):
+        """statement中获取returnStmt
+
         从statement节点递归搜索有效的returnStmt
 
         :param statement: 语法树节点对象（statement节点）
@@ -176,10 +193,11 @@ class MySemanticAnalyzer:
         return return_stmt
 
     def get_return_stmt_from_compound_stmt(self, compound_stmt):
-        """
+        """compoundStmt中获取returnStmt
+
         从compound_stmt节点中获得statementList节点，再顺序搜索statement节点，再递归搜索returnStmt
 
-        :param compound_stmt: 语法树节点对象（compound_stmt节点）
+        :param compound_stmt: 语法树节点对象（compoundStmt节点）
         :return: 语法树节点对象（returnStmt节点）
         """
         if compound_stmt is None:
@@ -198,8 +216,9 @@ class MySemanticAnalyzer:
         return return_stmt
 
     def check_node(self, node_obj):
-        """
-        Procedure checkNode performs type checking at a single tree node
+        """类型检查
+
+        通过检查语法树节点进行类型检查
 
         :param node_obj:
         :return:
@@ -243,13 +262,23 @@ class MySemanticAnalyzer:
                                % node_obj.child[2].basic_type.value)
 
     def type_check(self, syntax_tree_node_obj):
-        """
-        Procedure typeCheck performs type checking by a postorder syntax tree traversal
+        """后序遍历进行类型检查
 
-        :param syntax_tree_node_obj:
+        :param syntax_tree_node_obj: 语法树节点对象
         :return:
         """
         self.traverse(syntax_tree_node_obj, self.null_proc, self.check_node)
+
+    def build_symbol_table(self, syntax_tree_node_obj):
+        """前序遍历维护作用域集合和符号表
+
+        :param syntax_tree_node_obj: 语法树节点对象
+        :return:
+        """
+        self.traverse(syntax_tree_node_obj, self.insert_node, self.null_proc)
+        if self.trace_analyze:
+            print("\nSymbol table:\n")
+            print_scope()
 
 
 # 测试
@@ -265,7 +294,7 @@ if __name__ == '__main__':
            Algorithm to compute gcd. */
         int a[20];
         
-        int gcd (int u, int v)
+        int gcd (int u, int v[])
         {   if (v == 0)return u;
             if (v == 0)return u;
             else { 
@@ -316,4 +345,4 @@ if __name__ == '__main__':
     my_semantic_analyzer = MySemanticAnalyzer()
     my_semantic_analyzer.build_symbol_table(root_node)
     my_semantic_analyzer.type_check(root_node)
-    # print_symbol_table()
+    print_scope()

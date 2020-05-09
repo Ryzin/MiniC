@@ -149,8 +149,9 @@ def MyParser(tree_type="NST"):
                   | typeSpecifier ID LBRACKET RBRACKET
         """
         if tree_type is "AST":
+            node_kind = NodeKind.PARAM_K
             basic_type = BasicType.INT if len(p) is 3 else BasicType.ARRAY
-            normal_syntax_tree(p, 'param', basic_type=basic_type)
+            normal_syntax_tree(p, 'param', node_kind=node_kind, basic_type=basic_type)
         else:  # NST
             normal_syntax_tree(p, 'param')
 
@@ -161,6 +162,8 @@ def MyParser(tree_type="NST"):
         if tree_type is "AST":
             node_kind = NodeKind.COMPOUND_K
             normal_syntax_tree(p, 'compoundStmt', node_kind=node_kind)
+            p[0].child[0].node_kind = NodeKind.LBRACE_K
+            p[0].child[3].node_kind = NodeKind.RBRACE_K
         else:  # NST
             normal_syntax_tree(p, 'compoundStmt')
 

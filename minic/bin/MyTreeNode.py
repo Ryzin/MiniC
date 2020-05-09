@@ -12,25 +12,12 @@
 from enum import Enum
 
 
-# class NodeAttr(object):  # 在语法分析时确定
-#     # node_kind = None  # 值可以为NodeKind中的枚举类型，在代码生成时使用该属性
-#     basic_type = None
-#     kind = None  # 值可以为StmtKind或ExpKind中的枚举类型，在语义分析时使用该属性
-#
-#     def __init__(self, basic_type=None, kind=None):
-#         self.basic_type = basic_type
-#         self.kind = kind
-#
-#     # def __init__(self, node_kind=None, basic_type=None, kind=None):
-#     #     self.node_kind = node_kind
-#     #     self.basic_type = basic_type
-#     #     self.kind = kind
-#
-#     # class NodeKind(Enum):
-#     #     StmtK = 'StmtK'
-#     #     ExpK = 'ExpK'
-
 class NodeKind(Enum):
+    """语法树节点类型
+
+    用于唯一确定语法树节点的类型（语法树节点name属性不能唯一确定）
+
+    """
     # declaration kind
     FUN_DECLARE_K = 'FunDeclareK'
     VAR_DECLARE_K = 'VarDeclareK'
@@ -41,6 +28,12 @@ class NodeKind(Enum):
     RELOP_K = 'relop'
     ARIOP_K = 'ariop'
     NUM_K = 'num'
+    LBRACE_K = 'lbrace'
+    RBRACE_K = 'rbrace'
+
+    # param and args kind
+    PARAM_K = 'ParamK'
+    ARGS_K = 'ArgsK'
 
     # expression kind
     ASSIGN_K = 'AssignK'
@@ -58,6 +51,11 @@ class NodeKind(Enum):
 
 
 class BasicType(Enum):
+    """基本类型
+
+    用于确定变量的类型、函数的返回值类型、算数表达式运算结果的类型、比较表达式运算结果的类型等
+
+    """
     VOID = 'void'
     INT = 'int'
     ARRAY = 'arr'
@@ -98,7 +96,12 @@ class MyTreeNode(object):
         return item in self.child
 
     def add_child(self, obj):
-        if isinstance(obj, MyTreeNode):  # obj is node_obj
+        """添加孩子
+
+        :param obj: 任意对象
+        :return:
+        """
+        if isinstance(obj, MyTreeNode):
             self.child.append(obj)
         else:  # obj is node_name
             self.child.append(MyTreeNode(obj))

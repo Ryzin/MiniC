@@ -7,7 +7,7 @@
 @Version: 1.0
 @Author : 罗佳海
 @Date   : 2020/3/19 19:55
-@Desc   : Tiny 代码生成器
+@Desc   : 代码生成器
 """
 from MyLexer import MyLexer
 from MyParser import MyParser

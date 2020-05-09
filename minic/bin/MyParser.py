@@ -223,7 +223,8 @@ def MyParser(tree_type="NST"):
         if tree_type is "AST":
             if len(p) is 3:
                 node_kind = NodeKind.EXP_K
-                normal_syntax_tree(p, 'expressionStmt', node_kind=node_kind)
+                basic_type = p[1].basic_type
+                normal_syntax_tree(p, 'expressionStmt', node_kind=node_kind, basic_type=basic_type)
             else:
                 p[0] = MyTreeNode(p[1])
         else:  # NST
@@ -286,8 +287,9 @@ def MyParser(tree_type="NST"):
         if tree_type is "AST":
             if len(p) is 4:
                 node_kind = NodeKind.ASSIGN_K
+                basic_type = p[1].basic_type
                 # 虽然是右递归，但是需要expression作为父节点，所以不向p[0]追加孩子
-                normal_syntax_tree(p, 'expression', node_kind=node_kind)
+                normal_syntax_tree(p, 'expression', node_kind=node_kind, basic_type=basic_type)
             else:
                 p[0] = p[1]
         else:  # NST
@@ -330,8 +332,7 @@ def MyParser(tree_type="NST"):
                   | NEQ
         """
         if tree_type is "AST":
-            node_kind = NodeKind.RELOP_K
-            p[0] = MyTreeNode(p[1], node_kind=node_kind)
+            p[0] = MyTreeNode(p[1])
         else:  # NST
             normal_syntax_tree(p, 'relop')
 
@@ -342,8 +343,9 @@ def MyParser(tree_type="NST"):
         """
         if tree_type is "AST":
             if len(p) is 4:
+                node_kind = NodeKind.ARITHMETIC_K
                 basic_type = BasicType.INT
-                p[0] = MyTreeNode('additiveExpression', basic_type=basic_type)
+                p[0] = MyTreeNode('additiveExpression', node_kind=node_kind, basic_type=basic_type)
                 if p[1].name is 'additiveExpression':
                     p[0].child.extend(p[1].child)  # 将p[1]孩子列表中元素添加到p[0]的孩子列表中，丢弃p[1]
                 else:
@@ -361,8 +363,7 @@ def MyParser(tree_type="NST"):
                   | MINUS
         """
         if tree_type is "AST":
-            node_kind = NodeKind.ARIOP_K
-            p[0] = MyTreeNode(p[1], node_kind=node_kind)
+            p[0] = MyTreeNode(p[1])
         else:  # NST
             normal_syntax_tree(p, 'addop')
 
@@ -373,8 +374,9 @@ def MyParser(tree_type="NST"):
         """
         if tree_type is "AST":
             if len(p) is 4:
+                node_kind = NodeKind.ARITHMETIC_K
                 basic_type = BasicType.INT
-                p[0] = MyTreeNode('term', basic_type=basic_type)
+                p[0] = MyTreeNode('term', node_kind=node_kind, basic_type=basic_type)
                 if p[1].name is 'term':
                     p[0].child.extend(p[1].child)  # 将p[1]孩子列表中元素添加到p[0]的孩子列表中，丢弃p[1]
                 else:
@@ -392,8 +394,7 @@ def MyParser(tree_type="NST"):
                   | DIVIDE
         """
         if tree_type is "AST":
-            node_kind = NodeKind.ARIOP_K
-            p[0] = MyTreeNode(p[1], node_kind=node_kind)
+            p[0] = MyTreeNode(p[1])
         else:  # NST
             normal_syntax_tree(p, 'mulop')
 
@@ -438,11 +439,13 @@ def MyParser(tree_type="NST"):
         """
         # 增加input
         if tree_type is "AST":
+            basic_type = None
             if p[1] == 'input':
                 node_kind = NodeKind.INPUT_K
+                basic_type = BasicType.INT
             else:
                 node_kind = NodeKind.CALL_K
-            normal_syntax_tree(p, 'call', node_kind=node_kind)  # 返回类型在语义分析时确定
+            normal_syntax_tree(p, 'call', node_kind=node_kind, basic_type=basic_type)  # 返回类型在语义分析时确定
         else:  # NST
             normal_syntax_tree(p, 'call')
 

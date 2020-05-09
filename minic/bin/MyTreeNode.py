@@ -25,8 +25,6 @@ class NodeKind(Enum):
     # token kind:
     VAR_K = 'var'
     FUNC_K = 'func'
-    RELOP_K = 'relop'
-    ARIOP_K = 'ariop'
     NUM_K = 'num'
     LBRACE_K = 'lbrace'
     RBRACE_K = 'rbrace'
@@ -40,6 +38,7 @@ class NodeKind(Enum):
     COMPARE_K = 'CompareK'
     CALL_K = 'CallK'
     INPUT_K = 'InputK'
+    ARITHMETIC_K = 'ArithmeticK'
 
     # statement kind
     EXP_K = 'ExpK'

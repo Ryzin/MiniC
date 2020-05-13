@@ -16,14 +16,16 @@ from MySymbolTable import get_scope, st_lookup, st_insert, print_scope
 from MyTreeNode import NodeKind, BasicType
 
 
-trace_analyze = False
-
-
+# TODO 最后一个funDeclaration是main
 class MySemanticAnalyzer:
+    trace_analyze = False
     location = 0  # 变量内存位置计数器
     scope_id = 10000000  # 作用域id计数器
     current_scope = get_scope(scope_id, 0)  # 当前作用域
     error = False  # 错误标志
+
+    def __init__(self, trace_analyze=False):
+        self.trace_analyze = trace_analyze
 
     def traverse(self, node_obj, pre_proc, post_proc):
         """通用前后序遍历
@@ -127,7 +129,8 @@ class MySemanticAnalyzer:
                             if cur_child.node_kind is NodeKind.PARAM_K:
                                 # param : typeSpecifier ID | typeSpecifier ID LBRACKET RBRACKET
                                 symbol, scope = st_lookup(cur_child.child[1].name, self.current_scope.id + 1)
-                                if scope is not self.current_scope:  # 在当前作用域中不存在此声明
+                                if scope is not get_scope(self.current_scope.id + 1,
+                                                          self.current_scope.level + 1):  # 在下一作用域中不存在此声明
                                     # not yet in table, so treat as new definition
                                     tmp_scope_id = self.scope_id + 1  # peek到下一个作用域，作用域id先加1
                                     st_insert(cur_child.child[1].name, self.location, NodeKind.VAR_K,
@@ -135,8 +138,8 @@ class MySemanticAnalyzer:
                                               tmp_scope_id, self.current_scope.level)
                                     self.location = self.location + 1
                                 else:
-                                    self.error_msg("Semantic error", "Param", node_obj.child[1].name,
-                                                   node_obj.child[1].lineno, "already been declared")
+                                    self.error_msg("Semantic error", "Param", cur_child.child[1].name,
+                                                   cur_child.child[1].lineno, "already been declared")
                 else:
                     self.error_msg("Semantic error", "Function",node_obj.child[1].name,
                                    node_obj.child[1].lineno, "already been declared")
@@ -299,7 +302,7 @@ class MySemanticAnalyzer:
             # term : term mulop factor
             child_len = len(node_obj.child)
             for i in range(0, child_len, 2):
-                # 检查运算符左右的值是否为int
+                # 检查运算符左右的值是否为int（对于二元运算符，另一种方式是运算符作为树根，针对左右子树进行类型判断）
                 if node_obj.child[i].basic_type is not BasicType.INT:
                     self.error_msg("Type error", "Expression", '',
                                    node_obj.child[i].lineno,
@@ -332,7 +335,7 @@ class MySemanticAnalyzer:
         :return:
         """
         self.traverse(syntax_tree_node_obj, self.insert_node, self.null_proc)
-        if trace_analyze:
+        if self.trace_analyze:
             print("\nSymbol table:\n")
             print_scope()
 

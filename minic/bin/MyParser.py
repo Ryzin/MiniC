@@ -411,7 +411,7 @@ def MyParser(tree_type="NST"):
             elif isinstance(p[1], MyTreeNode):  # var or call
                 p[0] = p[1]
             else:  # NUM
-                node_kind = NodeKind.NUM_K
+                node_kind = NodeKind.CONST_K
                 basic_type = BasicType.INT
                 p[0] = MyTreeNode(p[1], node_kind=node_kind, basic_type=basic_type)
         else:  # NST

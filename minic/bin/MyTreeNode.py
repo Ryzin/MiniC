@@ -15,7 +15,7 @@ from enum import Enum
 class NodeKind(Enum):
     """语法树节点类型
 
-    用于唯一确定语法树节点的类型（语法树节点name属性不能唯一确定）
+    用于唯一确定语法树节点的类型（name属性不能唯一确定语法树节点的类型）
 
     """
     # declaration kind
@@ -25,7 +25,7 @@ class NodeKind(Enum):
     # token kind:
     VAR_K = 'var'
     FUNC_K = 'func'
-    NUM_K = 'num'
+    CONST_K = 'const'
     LBRACE_K = 'lbrace'
     RBRACE_K = 'rbrace'
 

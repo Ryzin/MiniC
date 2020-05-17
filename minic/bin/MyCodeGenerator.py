@@ -234,7 +234,7 @@ if __name__ == '__main__':
     lexer = MyLexer()
 
     # 测试用例1
-    s1 = """
+    source_str = """
         int gcd (int u, int v)
         {   if (v == 0)
                 return u;
@@ -244,7 +244,7 @@ if __name__ == '__main__':
         """
 
     # 词法分析器获得输入
-    lexer.input(s1)
+    lexer.input(source_str)
 
     # 标记化
     # for tok in lexer:
@@ -255,7 +255,7 @@ if __name__ == '__main__':
     parser = MyParser("AST")
 
     # 语法分析器分析输入
-    root_node = parser.parse(s1, lexer=lexer)
+    root_node = parser.parse(source_str, lexer=lexer)
 
     my_semantic_analyzer = MySemanticAnalyzer()
     my_semantic_analyzer.build_symbol_table(root_node)

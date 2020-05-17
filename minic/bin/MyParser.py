@@ -525,7 +525,7 @@ if __name__ == '__main__':
 
     # 测试用例1
     # s1 = """int x"""
-    s1 = """
+    source_str = """
     /* A program to perform Euclid's
        Algorithm to compute gcd. */
 
@@ -593,7 +593,7 @@ if __name__ == '__main__':
     """
 
     # 词法分析器获得输入
-    lexer.input(s1)
+    lexer.input(source_str)
 
     # 标记化
     # for tok in lexer:
@@ -613,7 +613,7 @@ if __name__ == '__main__':
     log = logging.getLogger()
 
     # 语法分析器分析输入
-    root_node = my_parser.parse(s1, lexer=lexer, debug=log)
+    root_node = my_parser.parse(source_str, lexer=lexer, debug=log)
     # parser.parse() 返回起始规则的p[0]
 
     # 控制台输出语法分析树

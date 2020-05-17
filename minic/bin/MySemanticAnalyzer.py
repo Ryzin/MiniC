@@ -17,6 +17,7 @@ from MyTreeNode import NodeKind, BasicType
 
 
 # TODO 最后一个funDeclaration是main
+# TODO 也许可以模仿python输出错误信息，如TypeError: '<' not supported between instances of 'int' and 'NoneType'
 class MySemanticAnalyzer:
     trace_analyze = False
     location = 0  # 变量内存位置计数器
@@ -348,7 +349,7 @@ if __name__ == '__main__':
     lexer = MyLexer()
 
     # 测试用例1
-    s1 = """
+    source_str = """
         /* A program to perform Euclid's
            Algorithm to compute gcd. */
         int a[20];
@@ -381,7 +382,7 @@ if __name__ == '__main__':
         """
 
     # 词法分析器获得输入
-    lexer.input(s1)
+    lexer.input(source_str)
 
     # 标记化
     # for tok in lexer:
@@ -395,7 +396,7 @@ if __name__ == '__main__':
     #     print(tok)
 
     # 语法分析器分析输入
-    root_node = parser.parse(s1, lexer=lexer)
+    root_node = parser.parse(source_str, lexer=lexer)
     # parser.parse() 返回起始规则的p[0]
 
     # 控制台输出语法分析树

@@ -13,7 +13,7 @@ from enum import Enum
 
 
 class NodeKind(Enum):
-    """语法树节点类型
+    """语法树节点类型枚举
 
     用于唯一确定语法树节点的类型（name属性不能唯一确定语法树节点的类型）
 
@@ -50,7 +50,7 @@ class NodeKind(Enum):
 
 
 class BasicType(Enum):
-    """基本类型
+    """基本类型枚举
 
     用于确定变量的类型、函数的返回值类型、算数表达式运算结果的类型、比较表达式运算结果的类型等
 

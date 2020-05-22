@@ -155,76 +155,8 @@ class MyCodeEmittingUtil:
             self.high_emit_loc = self.emit_loc
 
 
-def print_mem_reg(dmem_size, ac0=None, ac1=None, gp=None, mp=None, pc=None):
-    """
-
-    符号表计算的绝对地址可以生成相对gp的偏移来使用
-
-    :param dmem_size:
-    :param ac0:
-    :param ac1:
-    :param gp: global pointer [0, +b]，指示底部，用于所有命名变量访问
-    :param mp: memery pointer，[-a, 最高正规内存位置]，指示顶部作为栈，用于访问临时变量
-    :param pc:
-    :return:
-    """
-    pointer_gap = 7
-    if 0 == mp:
-        print(format("mp ——>", "^7"), " ——————————————————————   DMEM_SIZE-1")
-    else:
-        print(" " * pointer_gap, " ——————————————————————   DMEM_SIZE-1")
-
-    for i in range(1, dmem_size):
-        content = 'x'
-        memory_pointer = "mp ——>"
-        global_pointer = "gp ——>"
-        print(" " * pointer_gap, "|", format(content, "^20"), "|")  # 居中对齐
-        if i == mp:
-            print(format(memory_pointer, "<7"), end="")  # 左对齐
-            tmp_pointer_gap = 0
-        elif i == dmem_size - gp - 1:
-            print(format(global_pointer, "<7"), end="")  # 左对齐
-            tmp_pointer_gap = 0
-        else:
-            tmp_pointer_gap = pointer_gap
-
-        print(" " * tmp_pointer_gap, " ——————————————————————   %d" % (dmem_size - i - 1))
-    print(" " * pointer_gap, format("dMem", "^24"))
-
-    print()
-
-    reg_count = 8
-    register_gap = 1
-    for i in range(0, reg_count):
-        print(" ———————————— ", " " * register_gap, end="")
-    print()
-
-    reg_value = [0] * reg_count
-    reg_value[5] = gp
-    reg_value[6] = mp
-
-    for i in range(0, reg_count):
-        print("|", format(reg_value[i], "^10"), "|", " " * register_gap, end="")  # 居中对齐
-    print()
-
-    for i in range(0, reg_count):
-        print(" ———————————— ", " " * register_gap, end="")
-    print()
-
-    reg_name = ["ac0", "ac1", "non2", "non3", "non4", "gp5", "mp6", "pc7"]
-    for i in range(0, reg_count):
-        print(format(reg_name[i], "^14"), " " * register_gap, end="")
-    print()
-
-    reg_tag = ["右操作数", "左操作数", "从不使用", "从不使用", "从不使用", "全程指针", "内存指针", "程序计数"]
-    for i in range(0, reg_count):
-        print(format(reg_tag[i], "^12"), end="")
-
-
 # 测试
 if __name__ == '__main__':
-    print_mem_reg(6, gp=3, mp=1)
-    print()
     print(MyRegister.PC)
     # print('\n' * 15)
 

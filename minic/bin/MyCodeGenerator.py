@@ -141,7 +141,7 @@ def code_generate(node_obj):
         if emitUtil.trace_code:
             emitUtil.emit_comment("<- Id")
 
-    elif node_obj.node_kind is (NodeKind.ARITHMETIC_K or NodeKind.COMPARE_K):
+    elif node_obj.node_kind is NodeKind.ARITHMETIC_K or node_obj.node_kind is NodeKind.COMPARE_K:
         # additiveExpression : additiveExpression addop term
         # term : term mulop factor
         # simpleExpression : additiveExpression relop additiveExpression

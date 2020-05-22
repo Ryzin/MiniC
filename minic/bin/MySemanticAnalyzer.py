@@ -262,9 +262,9 @@ class MySemanticAnalyzer:
                                    "need to return a '%s' value" % basic_type.value)
 
         # selectionStmt or iterationStmt
-        elif node_obj.node_kind is (NodeKind.SELECTION_K or NodeKind.ITERATION_K):
+        elif node_obj.node_kind is NodeKind.SELECTION_K or node_obj.node_kind is NodeKind.ITERATION_K:
             # 检查if和while语句中的表达式类型
-            if not (node_obj.child[2].basic_type is BasicType.BOOL or BasicType.INT):
+            if not (node_obj.child[2].basic_type is BasicType.BOOL or node_obj.child[2].basic_type is BasicType.INT):
                 # selectionStmt : IF LPAREN expression RPAREN...
                 # iterationStmt : WHILE LPAREN expression RPAREN statement
                 self.error_msg("Type error", "Statement", node_obj.child[0].name,

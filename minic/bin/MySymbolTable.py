@@ -141,16 +141,25 @@ class Scope(object):
         print("##################################################################\n")
 
 
-def get_scope(scope_id, scope_level, enclosing_scope=None):
-    """获得作用域
+def get_scope(scope_id):
+    """获取作用域
+
+    :param scope_id: 作用域id
+    :return: 作用域对象的引用或None
+    """
+    return scope_map.get(scope_id)
+
+
+def update_scope(scope_id, scope_level, enclosing_scope=None):
+    """更新作用域
 
     当作用域在作用域集合里已创建时，仅更新相关属性并返回作用域的引用
     未创建时就创建新作用域对象，并添加到作用域集合中
 
     :param scope_id: 作用域id
     :param scope_level: 作用域级别
-    :param enclosing_scope:
-    :return:
+    :param enclosing_scope: 外层作用域对象的引用
+    :return: 作用域对象的引用
     """
     if scope_map.__contains__(scope_id):  # not None
         scope_map[scope_id].level = scope_level
@@ -163,7 +172,7 @@ def get_scope(scope_id, scope_level, enclosing_scope=None):
 
 def st_insert(symbol_name, mem_loc, id_kind, basic_type, size, lineno, scope_id, scope_level):
     """向指定作用域的符号表插入符号"""
-    scope = get_scope(scope_id, scope_level)
+    scope = update_scope(scope_id, scope_level)
     scope.insert_symbol(symbol_name, mem_loc, id_kind, basic_type, size, lineno)
 
 
@@ -199,12 +208,12 @@ def print_scope():
 if __name__ == '__main__':
     from MyTreeNode import NodeKind, BasicType
 
-    scope1 = get_scope(10000, 0)
+    scope1 = update_scope(10000, 0)
 
-    scope2 = get_scope(10001, 1)
+    scope2 = update_scope(10001, 1)
     scope2.enclosing_scope = scope1
 
-    scope3 = get_scope(10002, 0)
+    scope3 = update_scope(10002, 0)
 
     # Variable Name  Location  Id Kind  Basic Type  Size  Line Numbers
     st_insert("input", 0, NodeKind.FUNC_K, BasicType.INT, 1, 3, 10000)

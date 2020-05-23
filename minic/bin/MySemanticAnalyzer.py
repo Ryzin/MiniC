@@ -12,7 +12,7 @@
 # main.py required
 from MyLexer import tokens, MyLexer
 from MyParser import MyParser
-from MySymbolTable import get_scope, st_lookup, st_insert, print_scope
+from MySymbolTable import update_scope, st_lookup, st_insert, print_scope
 from MyTreeNode import NodeKind, BasicType
 
 
@@ -20,13 +20,22 @@ from MyTreeNode import NodeKind, BasicType
 # TODO 也许可以模仿python输出错误信息，如TypeError: '<' not supported between instances of 'int' and 'NoneType'
 class MySemanticAnalyzer:
     trace_analyze = False
-    location = 0  # 变量内存位置计数器
-    scope_id = 10000000  # 作用域id计数器
-    current_scope = get_scope(scope_id, 0)  # 当前作用域
+    location = None  # 变量内存位置计数器
+    scope_id = None  # 作用域id计数器
+    current_scope = None  # 当前作用域
     error = False  # 错误标志
 
     def __init__(self, trace_analyze=False):
         self.trace_analyze = trace_analyze
+
+    def init_scope(self):
+        """初始化作用域有关的变量
+
+        :return:
+        """
+        self.location = 0  # 变量内存位置计数器
+        self.scope_id = 10000000  # 作用域id计数器
+        self.current_scope = update_scope(self.scope_id, 0)  # 当前作用域
 
     def traverse(self, node_obj, pre_proc, post_proc):
         """通用前后序遍历
@@ -80,8 +89,8 @@ class MySemanticAnalyzer:
         # 左花括号
         if node_obj.node_kind is NodeKind.LBRACE_K:
             # 两种情况下会创建新的scope：一是提前peek到下一个scope id，如paramList；二是遇到左花括号（不一定创建）
-            self.scope_id = self.scope_id + 1  # 只有在遇到左花括号时，才更新scope_id属性
-            self.current_scope = get_scope(self.scope_id, self.current_scope.level + 1, self.current_scope)
+            self.scope_id = self.scope_id + 1  # 只有在遇到左花括号时，才自增scope_id属性
+            self.current_scope = update_scope(self.scope_id, self.current_scope.level + 1, self.current_scope)
 
         # 右花括号
         elif node_obj.node_kind is NodeKind.RBRACE_K:
@@ -129,11 +138,11 @@ class MySemanticAnalyzer:
                         for cur_child in param_list.child:  # paramList : paramList COMMA param
                             if cur_child.node_kind is NodeKind.PARAM_K:
                                 # param : typeSpecifier ID | typeSpecifier ID LBRACKET RBRACKET
-                                symbol, scope = st_lookup(cur_child.child[1].name, self.current_scope.id + 1)
-                                if scope is not get_scope(self.current_scope.id + 1,
-                                                          self.current_scope.level + 1):  # 在下一作用域中不存在此声明
+                                tmp_scope_id = self.scope_id + 1  # peek到下一个作用域，作用域id先加1
+                                symbol, scope = st_lookup(cur_child.child[1].name, tmp_scope_id)
+                                if scope is not update_scope(tmp_scope_id,
+                                                             self.current_scope.level + 1):  # 在下一作用域中不存在此声明
                                     # not yet in table, so treat as new definition
-                                    tmp_scope_id = self.scope_id + 1  # peek到下一个作用域，作用域id先加1
                                     st_insert(cur_child.child[1].name, self.location, NodeKind.VAR_K,
                                               cur_child.basic_type, 1, cur_child.child[1].lineno,
                                               tmp_scope_id, self.current_scope.level)
@@ -233,6 +242,16 @@ class MySemanticAnalyzer:
         if node_obj is None:
             return
 
+        # 左花括号
+        if node_obj.node_kind is NodeKind.LBRACE_K:
+            # 两种情况下会创建新的scope：一是提前peek到下一个scope id，如paramList；二是遇到左花括号（不一定创建）
+            self.scope_id = self.scope_id + 1
+            self.current_scope = update_scope(self.scope_id, self.current_scope.level + 1, self.current_scope)
+
+        # 右花括号
+        elif node_obj.node_kind is NodeKind.RBRACE_K:
+            self.current_scope = self.current_scope.enclosing_scope  # 回溯
+
         # varDeclaration
         if node_obj.node_kind is NodeKind.VAR_DECLARE_K:
             # 变量声明不能为void类型
@@ -315,11 +334,16 @@ class MySemanticAnalyzer:
         elif node_obj.node_kind is NodeKind.VAR_K:
             symbol, scope = st_lookup(node_obj.child[0].name, self.current_scope.id)
             if symbol is not None:
-                if not (symbol.basic_type is node_obj.basic_type):
-                    self.error_msg("Type error", "Variable", node_obj.child[0].name,
-                                   node_obj.child[0].lineno,
-                                   "declared as a '%s' value at line %d, not '%s'"
-                                   % (symbol.basic_type.value, symbol.lines[0], node_obj.basic_type.value))
+                if symbol.basic_type is BasicType.ARRAY:  # 声明为arr，使用元素为int
+                    if len(node_obj.child) < 2:
+                        self.error_msg("Type error", "Variable", node_obj.child[0].name,
+                                       node_obj.child[0].lineno, "array index missing?")
+                else:
+                    if not (symbol.basic_type is node_obj.basic_type):
+                        self.error_msg("Type error", "Variable", node_obj.child[0].name,
+                                       node_obj.child[0].lineno,
+                                       "declared as a '%s' value at line %d, not '%s'"
+                                       % (symbol.basic_type.value, symbol.lines[0], node_obj.basic_type.value))
 
     def type_check(self, syntax_tree_node_obj):
         """后序遍历进行类型检查
@@ -327,6 +351,7 @@ class MySemanticAnalyzer:
         :param syntax_tree_node_obj: 语法树节点对象
         :return:
         """
+        self.init_scope()
         self.traverse(syntax_tree_node_obj, self.null_proc, self.check_node)
 
     def build_symbol_table(self, syntax_tree_node_obj):
@@ -335,6 +360,7 @@ class MySemanticAnalyzer:
         :param syntax_tree_node_obj: 语法树节点对象
         :return:
         """
+        self.init_scope()
         self.traverse(syntax_tree_node_obj, self.insert_node, self.null_proc)
         if self.trace_analyze:
             print("\nSymbol table:\n")

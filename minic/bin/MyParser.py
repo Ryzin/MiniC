@@ -56,12 +56,12 @@ def MyParser(tree_type="NST"):
                             | declaration
         """
         if tree_type is "AST":
+            node_kind = NodeKind.DECLARE_LIST_K
+            p[0] = MyTreeNode('declarationList', node_kind=node_kind)
             if len(p) is 3:
-                p[0] = MyTreeNode('declarationList')
                 p[0].child.extend(p[1].child)  # 左递归，将p[1]孩子列表中元素添加到p[0]的孩子列表中，丢弃p[1]
                 p[0].add_child(p[2])
             else:
-                p[0] = MyTreeNode('declaration')
                 p[0].add_child(p[1])  # 保持declaration节点始终为孩子
         else:  # NST
             normal_syntax_tree(p, 'declarationList')
@@ -102,6 +102,7 @@ def MyParser(tree_type="NST"):
     def p_fun_declaration_type_specifier(p):
         """
             funDeclaration : typeSpecifier ID LPAREN params RPAREN compoundStmt
+                           | typeSpecifier MAIN LPAREN params RPAREN compoundStmt
         """
         if tree_type is "AST":
             node_kind = NodeKind.FUN_DECLARE_K
@@ -287,7 +288,7 @@ def MyParser(tree_type="NST"):
         if tree_type is "AST":
             if len(p) is 4:
                 node_kind = NodeKind.ASSIGN_K
-                basic_type = p[1].basic_type
+                basic_type = p[3].basic_type
                 # 虽然是右递归，但是需要expression作为父节点，所以不向p[0]追加孩子
                 normal_syntax_tree(p, 'expression', node_kind=node_kind, basic_type=basic_type)
             else:

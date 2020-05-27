@@ -14,10 +14,10 @@ from enum import Enum, IntEnum
 
 
 # const
-# IADDR_SIZE = 1024  # 指令集大小
-DADDR_SIZE = 1024  # 内存大小
+IADDR_SIZE = 1024  # 指令存储区大小
+DADDR_SIZE = 1024  # 内存数据区大小
 REGS_SIZE = 8  # 寄存器个数
-PC_REG = 7  # pc寄存器的在reg中的索引
+PC_REG = 7  # 程序计数器寄存器的在reg中的索引
 
 
 class OpClass(Enum):
@@ -37,31 +37,31 @@ class OpCode(IntEnum):
     用于确定指令中操作码的类型
 
     """
-    # RR Instructions
-    OP_HALT = 0  # RR     halt, operands are ignored
-    OP_IN = 1  # RR     read into reg(r); s and t are ignored
-    OP_OUT = 2  # RR     write from reg(r), s and t are ignored
-    OP_ADD = 3  # RR     reg(r) = reg(s)+reg(t)
-    OP_SUB = 4  # RR     reg(r) = reg(s)-reg(t)
-    OP_MUL = 5  # RR     reg(r) = reg(s)*reg(t)
-    OP_DIV = 6  # RR     reg(r) = reg(s)/reg(t)
-    OP_RRLIM = 7  # limit of RR opcodes
+    # RR指令(opcode r,s,t)
+    OP_HALT = 0  # 停止执行(忽略操作数)
+    OP_IN = 1  # reg[r] ← 从标准读入整形值(s和t忽略)
+    OP_OUT = 2  # reg[r] → 标准输出(s和t忽略)
+    OP_ADD = 3  # reg[r] = reg[s] + reg[t]
+    OP_SUB = 4  # reg[r] = reg[s] - reg[t]
+    OP_MUL = 5  # reg[r] = reg[s] * reg[t]
+    OP_DIV = 6  # reg[r] = reg[s] / reg[t](可能产生ZERO_DIV)
+    OP_RRLIM = 7  # RR操作码的范围
 
-    # RM Instructions
-    OP_LD = 8  # RM     reg(r) = mem(d+reg(s))
-    OP_ST = 9  # RM     mem(d+reg(s)) = reg(r)
-    OP_RMLIM = 10  # Limit of RM opcodes
+    # RM指令(opcode r,d(s))
+    OP_LD = 8  # reg[r] = dMem[d + reg[s]](将d + reg[s]中的值装入r)
+    OP_ST = 9  # mem(d + reg[s]) = reg[r](将r的值存入位置d + reg[s])
+    OP_RMLIM = 10  # RM操作码的范围
 
-    # RA Instructions
-    OP_LDA = 11  # RA     reg(r) = d+reg(s)
-    OP_LDC = 12  # RA     reg(r) = d ; reg(s) is ignored
-    OP_JLT = 13  # RA     if reg(r)<0 then reg(7) = d+reg(s)
-    OP_JLE = 14  # RA     if reg(r)<=0 then reg(7) = d+reg(s)
-    OP_JGT = 15  # RA     if reg(r)>0 then reg(7) = d+reg(s)
-    OP_JGE = 16  # RA     if reg(r)>=0 then reg(7) = d+reg(s)
-    OP_JEQ = 17  # RA     if reg(r)==0 then reg(7) = d+reg(s)
-    OP_JNE = 18  # RA     if reg(r)!=0 then reg(7) = d+reg(s)
-    OP_RALIM = 19  # Limit of RA opcodes
+    # RA指令(opcode r,d(s))
+    OP_LDA = 11  # reg[r] = d + reg[s](将地址d + reg[s]直接装入r)
+    OP_LDC = 12  # reg[r] = d(将常数d直接装入r, 忽略s)
+    OP_JLT = 13  # if reg[r] < 0 then reg[PC_REG] = d + reg[s](如果r小于零转移到d + reg[s]，下同)
+    OP_JLE = 14  # if reg[r] <= 0 then reg[PC_REG] = d + reg[s]
+    OP_JGT = 15  # if reg[r] > 0 then reg[PC_REG] = d + reg[s]
+    OP_JGE = 16  # if reg[r] >= 0 then reg[PC_REG] = d + reg[s]
+    OP_JEQ = 17  # if reg[r] == 0 then reg[PC_REG] = d + reg[s]
+    OP_JNE = 18  # if reg[r] != 0 then reg[PC_REG] = d + reg[s]
+    OP_RALIM = 19  # RA操作码的范围
 
 
 class StepResult(IntEnum):
@@ -96,8 +96,8 @@ class Instruction:
 
 
 # vars
-i_loc = 0  # 当前指令集访问索引
-d_loc = 0  # 当前内存访问索引
+i_loc = 0  # 当前指令存储区访问索引
+d_loc = 0  # 当前内存数据区访问索引
 trace_flag = False  # 指令内容跟踪
 i_count_flag = False  # 指令条数跟踪
 
@@ -146,10 +146,10 @@ def write_instruction(loc):
     :param loc: i_mem的索引
     :return:
     """
-    global op_code_tab, i_mem
+    global op_code_tab, i_mem, IADDR_SIZE
 
     print("%5d: " % loc, end="")
-    if 0 <= loc < len(i_mem):
+    if 0 <= loc < IADDR_SIZE:
         print("%6s%3d," % (op_code_tab[i_mem[loc].op], i_mem[loc].arg1), end="")  # TODO
         op_class = get_op_class(i_mem[loc].op)
         if op_class is OpClass.OPC_IRR:
@@ -294,17 +294,19 @@ def read_instructions():
 
     :return: 当读取某一条指令发现错误时返回False，全部指令正确读取返回True
     """
-    global reg, REGS_SIZE, d_mem, i_mem, DADDR_SIZE, \
+    global reg, REGS_SIZE, d_mem, i_mem, DADDR_SIZE, IADDR_SIZE, \
         source_str, str_list, line_len, in_line, in_col, num, word, op_code_tab
 
     lineno = 0  # 当前行号
 
     # 初始化i_mem
     i_mem = []
+    for loc in range(0, IADDR_SIZE):
+        i_mem.append(Instruction(OpCode.OP_HALT, 0, 0, 0))
 
     # 初始化d_mem
     d_mem = [0] * DADDR_SIZE
-    d_mem[0] = DADDR_SIZE - 1  # TODO what
+    d_mem[0] = DADDR_SIZE - 1  # 存放最高正规地址的值
 
     # 初始化reg
     reg = [0] * REGS_SIZE
@@ -324,6 +326,8 @@ def read_instructions():
             if not get_num():  # 获取不到行号
                 return error("Bad location", lineno, -1)
             loc = num  # 获得指令号（不是当前行号，当前行号>=指令号，因为还有注释行和空行）
+            if loc > IADDR_SIZE:
+                return error("Location too large", lineno, loc)
             if not skip_ch(':'):  # 缺少行号后跟的冒号
                 return error("Missing colon", lineno, loc)
             if not get_word():  # 缺少操作码
@@ -373,7 +377,10 @@ def read_instructions():
                 arg3 = num
 
             # 转化为指令对象存储
-            i_mem.append(Instruction(op, arg1, arg2, arg3))
+            i_mem[loc].op = op
+            i_mem[loc].arg1 = arg1
+            i_mem[loc].arg2 = arg2
+            i_mem[loc].arg3 = arg3
 
     return True
 
@@ -385,7 +392,7 @@ def step_tm():
 
     :return: 执行结果类型枚举
     """
-    global PC_REG, reg, in_line, in_col, i_mem, d_mem, line_len
+    global PC_REG, reg, IADDR_SIZE, in_line, in_col, i_mem, d_mem, line_len
 
     r = None
     s = None
@@ -394,7 +401,7 @@ def step_tm():
 
     # 从pc保存的指令位置取指，开始执行指令
     pc = reg[PC_REG]  # pc寄存器的值表示指令偏移
-    if pc < 0 or pc > len(i_mem):  # 指令集读错误
+    if pc < 0 or pc > IADDR_SIZE:  # 指令集读错误
         return StepResult.SR_IMEM_ERR
     if pc == len(i_mem):  # 防止i_mem读越界
         pc = pc - 1
@@ -606,7 +613,7 @@ def do_command():
         if not at_eol():
             print("Instruction locations?")
         else:  # 需要已经扫描到结尾
-            while 0 <= i_loc < len(i_mem) and print_cnt > 0:
+            while 0 <= i_loc < IADDR_SIZE and print_cnt > 0:
                 write_instruction(i_loc)
                 i_loc = i_loc + 1
                 print_cnt = print_cnt - 1
@@ -672,48 +679,57 @@ if __name__ == '__main__':
     # 检测文件有效性，有误给出输出
 
     source_str = """
-  0:     LD  6,0(0) 
-  1:     ST  0,0(0) 
-  2:     IN  0,0,0 
-  3:     ST  0,0(5) 
-  4:    LDC  0,0(0) 
-  5:     ST  0,0(6) 
-  6:     LD  0,0(5) 
-  7:     LD  1,0(6) 
-  8:    SUB  0,1,0 
-  9:    JLT  0,2(7) 
- 10:    LDC  0,0(0) 
- 11:    LDA  7,1(7) 
- 12:    LDC  0,1(0) 
- 14:    LDC  0,1(0) 
- 15:     ST  0,1(5) 
- 16:     LD  0,1(5) 
- 17:     ST  0,0(6) 
- 18:     LD  0,0(5) 
- 19:     LD  1,0(6) 
- 20:    MUL  0,1,0 
- 21:     ST  0,1(5) 
- 22:     LD  0,0(5) 
- 23:     ST  0,0(6) 
- 24:    LDC  0,1(0) 
- 25:     LD  1,0(6) 
- 26:    SUB  0,1,0 
- 27:     ST  0,0(5) 
- 28:     LD  0,0(5) 
- 29:     ST  0,0(6) 
- 30:    LDC  0,0(0) 
- 31:     LD  1,0(6) 
- 32:    SUB  0,1,0 
- 33:    JEQ  0,2(7) 
- 34:    LDC  0,0(0) 
- 35:    LDA  7,1(7) 
- 36:    LDC  0,1(0) 
- 37:    JEQ  0,-22(7) 
- 38:     LD  0,1(5) 
- 39:    OUT  0,0,0 
- 13:    JEQ  0,27(7) 
- 40:    LDA  7,0(7) 
- 41:   HALT  0,0,0 
+* TINY Compilation to TM Code
+* File: SAMPLE2.tm
+* Standard prelude:
+  0:     LD  6,0(0) 	load maxaddress from location 0
+  1:     ST  0,0(0) 	clear location 0
+* End of standard prelude.
+  2:     IN  0,0,0 	read integer value
+  3:     ST  0,0(5) 	read: store value
+* -> if
+* -> Op
+* -> Const
+  4:    LDC  0,0(0) 	load const
+* <- Const
+  5:     ST  0,0(6) 	op: push left
+* -> Id
+  6:     LD  0,0(5) 	load id value
+* <- Id
+  7:     LD  1,0(6) 	op: load left
+  8:    SUB  0,1,0 	op <
+  9:    JLT  0,2(7) 	br if true
+ 10:    LDC  0,0(0) 	false case
+ 11:    LDA  7,1(7) 	unconditional jmp
+ 12:    LDC  0,1(0) 	true case
+* <- Op
+* if: jump to else belongs here
+* -> assign
+* -> Const
+ 14:    LDC  0,1(0) 	load const
+* <- Const
+ 15:     ST  0,1(5) 	assign: store value
+* <- assign
+* -> Id
+ 16:     LD  0,1(5) 	load id value
+* <- Id
+ 17:    OUT  0,0,0 	write ac
+* if: jump to end belongs here
+ 13:    JEQ  0,5(7) 	if: jmp to else
+* -> assign
+* -> Const
+ 19:    LDC  0,0(0) 	load const
+* <- Const
+ 20:     ST  0,1(5) 	assign: store value
+* <- assign
+* -> Id
+ 21:     LD  0,1(5) 	load id value
+* <- Id
+ 22:    OUT  0,0,0 	write ac
+ 18:    LDA  7,4(7) 	jmp to end
+* <- if
+* End of execution.
+ 23:   HALT  0,0,0 	
 """
 
     # 测试str.splitlines()
@@ -749,10 +765,11 @@ if __name__ == '__main__':
     # 测试read_instructions()
     # read_instructions()
     # print(len(i_mem))
-    # print(i_mem[41].op)
-    # print(i_mem[41].arg1)
-    # print(i_mem[41].arg2)
-    # print(i_mem[41].arg3)
+    # for instruction in i_mem:
+    #     print(instruction.op, end=" ")
+    #     print(instruction.arg1, end=" ")
+    #     print(instruction.arg2, end=" ")
+    #     print(instruction.arg3)
 
     # 测试get_word()
     # in_line = input()

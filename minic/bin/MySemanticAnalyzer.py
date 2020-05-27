@@ -20,7 +20,7 @@ from MyTreeNode import NodeKind, BasicType
 # TODO 也许可以模仿python输出错误信息，如TypeError: '<' not supported between instances of 'int' and 'NoneType'
 class MySemanticAnalyzer:
     trace_analyze = False
-    location = None  # 变量内存位置计数器
+    location = None  # 内存位置计数器
     scope_id = None  # 作用域id计数器
     current_scope = None  # 当前作用域
     error = False  # 错误标志
@@ -33,7 +33,7 @@ class MySemanticAnalyzer:
 
         :return:
         """
-        self.location = 0  # 变量内存位置计数器
+        self.location = 0  # 内存位置计数器
         self.scope_id = 10000000  # 作用域id计数器
         self.current_scope = update_scope(self.scope_id, 0)  # 当前作用域
 
@@ -105,7 +105,7 @@ class MySemanticAnalyzer:
                     st_insert(node_obj.child[1].name, self.location, NodeKind.VAR_K,
                               node_obj.basic_type, 1, node_obj.child[1].lineno,
                               self.current_scope.id, self.current_scope.level)
-                    self.location = self.location + 1  # 新节点，需要加1
+                    self.location = self.location + 1
                 else:
                     self.error_msg("Semantic error", "Variable", node_obj.child[1].name,
                                    node_obj.child[1].lineno, "already been declared")
@@ -116,7 +116,7 @@ class MySemanticAnalyzer:
                     st_insert(node_obj.child[1].name, self.location, NodeKind.VAR_K,
                               node_obj.basic_type, node_obj.child[3].name, node_obj.child[1].lineno,
                               self.current_scope.id, self.current_scope.level)
-                    self.location = self.location + 1
+                    self.location = self.location + int(node_obj.child[3].name)  # 数组的连续内存区域
                 else:
                     self.error_msg("Semantic error", "Variable", node_obj.child[1].name,
                                    node_obj.child[1].lineno, "already been declared")

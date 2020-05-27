@@ -10,8 +10,10 @@
 @Desc   : 代码发行实现
 """
 
+from enum import IntEnum
 
-class MyRegister:
+
+class MyRegister(IntEnum):
     AC0 = 0  # 1st accumulator
     AC1 = 1  # 2nd accumulator
     GP = 5  # global pointer, points to bottom of memory for (global) variable storage
@@ -86,10 +88,10 @@ class MyCodeEmittingUtil:
     def emit_skip(self, how_many):
         """
 
-        用于跳过将来要反填的一些位置并返回当前指令位置且保存在emit_loc属性
+        用于跳过将来要回填的一些位置，并返回当前指令位置且保存在emit_loc属性
 
         典型的应用是调用emit_skip(1)，它跳过一个位置，这个位置后
-        来会填上转移指令，而emit_skip(0)不跳过位置，调用它只是为
+        来会填上转移指令。而emit_skip(0)不跳过位置，调用它只是为
         了得到当前位置以备后来的转移引用
 
         :param how_many: skips "howMany" code locations for later backpatch

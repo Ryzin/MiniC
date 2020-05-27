@@ -19,6 +19,7 @@ class NodeKind(Enum):
 
     """
     # declaration kind
+    DECLARE_LIST_K = 'DeclareListK'
     FUN_DECLARE_K = 'FunDeclareK'
     VAR_DECLARE_K = 'VarDeclareK'
 

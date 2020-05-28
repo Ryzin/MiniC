@@ -21,7 +21,8 @@ reserved = {
     'void'  : 'VOID',
     'while' : 'WHILE',
     'input' : 'INPUT',
-    'output': 'OUTPUT'
+    'output': 'OUTPUT',
+    'main'  : 'MAIN'
     # add more...
 }
 
@@ -50,8 +51,6 @@ tokens = [
              'ID',
              'NUM',
              # 'STR',
-             # 'INPUT',
-             # 'OUTPUT'
          ] + list(reserved.values())
 
 

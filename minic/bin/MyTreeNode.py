@@ -31,7 +31,7 @@ class NodeKind(Enum):
     RBRACE_K = 'rbrace'
 
     # param and args kind
-    PARAM_K = 'ParamK'
+    PARAMS_K = 'ParamsK'
     ARGS_K = 'ArgsK'
 
     # expression kind

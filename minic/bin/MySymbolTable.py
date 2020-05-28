@@ -216,11 +216,11 @@ if __name__ == '__main__':
     scope3 = update_scope(10002, 0)
 
     # Variable Name  Location  Id Kind  Basic Type  Size  Line Numbers
-    st_insert("input", 0, NodeKind.FUNC_K, BasicType.INT, 1, 3, 10000)
-    st_insert("x", 1, NodeKind.VAR_K, BasicType.INT, 1, 4, 10000)
+    st_insert("input", 0, NodeKind.FUNC_K, BasicType.INT, 1, 3, 10000, 0)
+    st_insert("x", 1, NodeKind.VAR_K, BasicType.INT, 1, 4, 10000, 1)
 
-    st_insert("output", 2, NodeKind.FUNC_K, BasicType.VOID, 1, 6, 10001)
-    st_insert("y", 3, NodeKind.VAR_K, BasicType.INT, 1, 7, 10002)
+    st_insert("output", 2, NodeKind.FUNC_K, BasicType.VOID, 1, 6, 10001, 0)
+    st_insert("y", 3, NodeKind.VAR_K, BasicType.INT, 1, 7, 10002, 1)
 
     # print(scope_map)
     print_scope()

@@ -19,8 +19,7 @@ from PyQt5.QtWidgets import QMainWindow, QFileDialog, QApplication, QTreeWidgetI
 from PyQt5 import QtGui
 from PyQt5.QtCore import pyqtSlot
 
-from bin.MyLexer import tokens
-from bin.MyLexer import MyLexer
+from bin.MyLexer import tokens, MyLexer
 from bin.MyParser import MyParser
 from bin.MyStream import MyStream
 import mainwindow

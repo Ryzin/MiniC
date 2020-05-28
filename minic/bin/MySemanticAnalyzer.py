@@ -16,8 +16,6 @@ from MySymbolTable import update_scope, st_lookup, st_insert, print_scope
 from MyTreeNode import NodeKind, BasicType
 
 
-# TODO 最后一个funDeclaration是main
-# TODO 也许可以模仿python输出错误信息，如TypeError: '<' not supported between instances of 'int' and 'NoneType'
 class MySemanticAnalyzer:
     trace_analyze = False
     location = None  # 内存位置计数器
@@ -89,7 +87,7 @@ class MySemanticAnalyzer:
         # 左花括号
         if node_obj.node_kind is NodeKind.LBRACE_K:
             # 两种情况下会创建新的scope：一是提前peek到下一个scope id，如paramList；二是遇到左花括号（不一定创建）
-            self.scope_id = self.scope_id + 1  # 只有在遇到左花括号时，才自增scope_id属性
+            self.scope_id += 1  # 只有在遇到左花括号时，才自增scope_id属性
             self.current_scope = update_scope(self.scope_id, self.current_scope.level + 1, self.current_scope)
 
         # 右花括号
@@ -98,72 +96,73 @@ class MySemanticAnalyzer:
 
         # varDeclaration
         elif node_obj.node_kind is NodeKind.VAR_DECLARE_K:
-            if len(node_obj.child) is 3:  # varDeclaration : typeSpecifier ID SEMI
-                symbol, scope = st_lookup(node_obj.child[1].name, self.current_scope.id)
+            if len(node_obj.child) is 1:  # varDeclaration ~ [ID]
+                symbol, scope = st_lookup(node_obj.child[0].name, self.current_scope.id)
                 if scope is not self.current_scope:  # 在当前作用域中不存在此声明
-                    # not yet in table, so treat as new definition
-                    st_insert(node_obj.child[1].name, self.location, NodeKind.VAR_K,
-                              node_obj.basic_type, 1, node_obj.child[1].lineno,
+                    # 新定义变量，加入到当前作用域符号表中
+                    st_insert(node_obj.child[0].name, self.location, NodeKind.VAR_K,
+                              node_obj.basic_type, 1, node_obj.child[0].lineno,
                               self.current_scope.id, self.current_scope.level)
-                    self.location = self.location + 1
+                    self.location += 1
                 else:
-                    self.error_msg("Semantic error", "Variable", node_obj.child[1].name,
-                                   node_obj.child[1].lineno, "already been declared")
-            elif len(node_obj.child) is 6:  # varDeclaration | typeSpecifier ID LBRACKET NUM RBRACKET SEMI
-                symbol, scope = st_lookup(node_obj.child[1].name, self.current_scope.id)
+                    self.error_msg("Semantic error", "Variable", node_obj.child[0].name,
+                                   node_obj.child[1].lineno, "already been defined at line '%d'" % symbol.lines[0])
+            elif len(node_obj.child) is 2:  # varDeclaration ~ [ID, NUM]
+                symbol, scope = st_lookup(node_obj.child[0].name, self.current_scope.id)
                 if scope is not self.current_scope:  # 在当前作用域中不存在此声明
-                    # not yet in table, so treat as new definition
-                    st_insert(node_obj.child[1].name, self.location, NodeKind.VAR_K,
-                              node_obj.basic_type, node_obj.child[3].name, node_obj.child[1].lineno,
+                    # 新定义变量，加入到当前作用域符号表中
+                    st_insert(node_obj.child[0].name, self.location, NodeKind.VAR_K,
+                              node_obj.basic_type, node_obj.child[1].name, node_obj.child[0].lineno,
                               self.current_scope.id, self.current_scope.level)
-                    self.location = self.location + int(node_obj.child[3].name)  # 数组的连续内存区域
+                    self.location += int(node_obj.child[1].name)  # 数组的连续内存区域
                 else:
-                    self.error_msg("Semantic error", "Variable", node_obj.child[1].name,
-                                   node_obj.child[1].lineno, "already been declared")
+                    self.error_msg("Semantic error", "Variable", node_obj.child[0].name,
+                                   node_obj.child[0].lineno, "already been defined at line '%d'" % symbol.lines[0])
 
         # funDeclaration
         elif node_obj.node_kind is NodeKind.FUN_DECLARE_K:
-            if len(node_obj.child) is 6:  # funDeclaration : typeSpecifier ID LPAREN params RPAREN compoundStmt
-                symbol, scope = st_lookup(node_obj.child[1].name, self.current_scope.id)
-                if scope is not self.current_scope:  # 在当前作用域中不存在此声明
-                    # not yet in table, so treat as new definition
-                    st_insert(node_obj.child[1].name, self.location, NodeKind.FUNC_K,
-                              node_obj.basic_type, 1, node_obj.child[1].lineno,
-                              self.current_scope.id, self.current_scope.level)
-                    self.location = self.location + 1
+            # funDeclaration ~ [ID, params, compoundStmt]
+            symbol, scope = st_lookup(node_obj.child[0].name, self.current_scope.id)
+            if scope is not self.current_scope:  # 在当前作用域中不存在此声明
+                # 新定义变量，加入到当前作用域符号表中
+                st_insert(node_obj.child[0].name, self.location, NodeKind.FUNC_K,
+                          node_obj.basic_type, len(node_obj.child[1].child), node_obj.child[0].lineno,
+                          self.current_scope.id, self.current_scope.level)
+                self.location += 1
 
-                    # paramList
-                    param_list = node_obj.child[3]
-                    if param_list is not None:
-                        for cur_child in param_list.child:  # paramList : paramList COMMA param
-                            if cur_child.node_kind is NodeKind.PARAM_K:
-                                # param : typeSpecifier ID | typeSpecifier ID LBRACKET RBRACKET
-                                tmp_scope_id = self.scope_id + 1  # peek到下一个作用域，作用域id先加1
-                                symbol, scope = st_lookup(cur_child.child[1].name, tmp_scope_id)
-                                if scope is not update_scope(tmp_scope_id,
-                                                             self.current_scope.level + 1):  # 在下一作用域中不存在此声明
-                                    # not yet in table, so treat as new definition
-                                    st_insert(cur_child.child[1].name, self.location, NodeKind.VAR_K,
-                                              cur_child.basic_type, 1, cur_child.child[1].lineno,
-                                              tmp_scope_id, self.current_scope.level)
-                                    self.location = self.location + 1
-                                else:
-                                    self.error_msg("Semantic error", "Param", cur_child.child[1].name,
-                                                   cur_child.child[1].lineno, "already been declared")
-                else:
-                    self.error_msg("Semantic error", "Function",node_obj.child[1].name,
-                                   node_obj.child[1].lineno, "already been declared")
+                # params
+                params = node_obj.child[1]
+                for param in params.child:  # params ~ [param, param, ...]
+                    # param ~ [ID]
+                    tmp_scope_id = self.scope_id + 1  # peek到下一个作用域，作用域id先加1
+                    symbol, scope = st_lookup(param.child[0].name, tmp_scope_id)
+                    if scope is not update_scope(tmp_scope_id,
+                                                 self.current_scope.level + 1):  # 在下一作用域中不存在此声明
+                        # 新定义变量，加入到当前作用域符号表中
+                        st_insert(param.child[0].name, self.location, NodeKind.VAR_K,
+                                  param.basic_type, 1, param.child[0].lineno,
+                                  tmp_scope_id, self.current_scope.level)
+                        self.location += 1
+                    else:
+                        self.error_msg("Semantic error", "Param", param.child[0].name,
+                                       param.child[0].lineno, "already been defined at line '%d'" % symbol.lines[0])
+            else:
+                self.error_msg("Semantic error", "Function", node_obj.child[0].name,
+                               node_obj.child[0].lineno, "already been defined at line '%d'" % symbol.lines[0])
 
         # call
-        elif node_obj.node_kind is NodeKind.CALL_K:   # call : ID LPAREN args RPAREN
+        elif node_obj.node_kind is NodeKind.CALL_K:   # call ~ [ID, args]
             symbol, scope = st_lookup(node_obj.child[0].name, self.current_scope.id)
             if symbol is None:  # 在包围作用域中不存在此声明
                 self.error_msg("Semantic error", "Function", node_obj.child[0].name,
-                               node_obj.child[0].lineno, "using before declared")
+                               node_obj.child[0].lineno, "not defined")
             else:
                 if symbol.id_kind is NodeKind.FUNC_K:  # 确定被调用函数的返回类型（只有call才在语义分析时确定basic_type）
+                    if symbol.size != len(node_obj.child[1].child):  # 检查参数列表长度是否匹配
+                        self.error_msg("Semantic error", "Call", node_obj.child[0].name,
+                                       node_obj.child[0].lineno, "list of argument not match")
                     node_obj.basic_type = symbol.basic_type
-                    # already in table, so ignore location, add line number of use only
+                    # 符号表中已存在该变量，只追加行号
                     st_insert(symbol.name, 0, symbol.id_kind, symbol.basic_type,
                               1, node_obj.child[0].lineno, scope.id, scope.level)
                 else:
@@ -171,13 +170,13 @@ class MySemanticAnalyzer:
                                    node_obj.child[0].lineno, "not a function")
 
         # var
-        elif node_obj.node_kind is NodeKind.VAR_K:
+        elif node_obj.node_kind is NodeKind.VAR_K:  # var ~ [ID]
             symbol, scope = st_lookup(node_obj.child[0].name, self.current_scope.id)
             if symbol is None:  # 在包围作用域中不存在此声明
                 self.error_msg("Semantic error", "Variable", node_obj.child[0].name,
-                               node_obj.child[0].lineno, "using before declared")
+                               node_obj.child[0].lineno, "not defined")
             else:
-                # already in table, so ignore location, add line number of use only
+                # 符号表中已存在该变量，只追加行号
                 st_insert(symbol.name, 0, symbol.id_kind, symbol.basic_type,
                           1, node_obj.child[0].lineno, scope.id, scope.level)
 
@@ -195,10 +194,9 @@ class MySemanticAnalyzer:
 
         if statement.node_kind is NodeKind.COMPOUND_K:
             return_stmt = self.get_return_stmt_from_compound_stmt(statement)
-        elif statement.node_kind is NodeKind.SELECTION_K:
-            if len(statement.child) is 7 and statement.child[6] is not None:  # 寻找else中的returnStmt
-                # selectionStmt | IF LPAREN expression RPAREN statement ELSE statement
-                return_stmt = self.get_return_stmt_from_statement(statement.child[6])
+        elif statement.node_kind is NodeKind.SELECTION_K:  # selectionStmt ~ [expression, statement, (statement)]
+            if len(statement.child) is 3:  # 寻找else中的returnStmt
+                return_stmt = self.get_return_stmt_from_statement(statement.child[2])
         # elif statement.node_kind is NodeKind.ITERATION_K:
         #     # iterationStmt : WHILE LPAREN expression RPAREN statement
         #     if len(statement.child) is 5 and statement.child[4] is not None:
@@ -245,93 +243,109 @@ class MySemanticAnalyzer:
         # 左花括号
         if node_obj.node_kind is NodeKind.LBRACE_K:
             # 两种情况下会创建新的scope：一是提前peek到下一个scope id，如paramList；二是遇到左花括号（不一定创建）
-            self.scope_id = self.scope_id + 1
+            self.scope_id += 1
             self.current_scope = update_scope(self.scope_id, self.current_scope.level + 1, self.current_scope)
 
         # 右花括号
         elif node_obj.node_kind is NodeKind.RBRACE_K:
             self.current_scope = self.current_scope.enclosing_scope  # 回溯
 
+        # declarationList
+        if node_obj.node_kind is NodeKind.DECLARE_LIST_K:  # （此if判断可以放最后以提高扫描效率）
+            # 检查main函数是否在最后声明
+            last_fun_declaration = None
+            if len(node_obj.child) < 1:
+                self.error_msg("Semantic error", "Function", 'main',
+                               0,
+                               "program entry point not found")
+            found = False
+            for i in range(len(node_obj.child)-1, -1, -1):  # 倒序查找倒数第一个函数声明
+                if node_obj.child[i].node_kind is NodeKind.FUN_DECLARE_K:
+                    found = (node_obj.child[i].child[0].name == "main")
+                    break
+            if not found:
+                self.error_msg("Semantic error", "Function", 'main',
+                               0,
+                               "program entry point not found")
+
         # varDeclaration
-        if node_obj.node_kind is NodeKind.VAR_DECLARE_K:
+        elif node_obj.node_kind is NodeKind.VAR_DECLARE_K:
             # 变量声明不能为void类型
-            type_specifier = node_obj.child[0]  # varDeclaration : typeSpecifier...
-            if type_specifier is not None and type_specifier.basic_type is BasicType.VOID:
-                self.error_msg("Type error", "Variable", node_obj.child[1].name,
-                               node_obj.child[1].lineno,
-                               "not allowed to declared as '%s' type" % type_specifier.basic_type.value)
+            basic_type = node_obj.basic_type  # varDeclaration ~ [ID, (NUM)]
+            if basic_type is BasicType.VOID:
+                self.error_msg("Type error", "Variable", node_obj.child[0].name,
+                               node_obj.child[0].lineno,
+                               "not allowed to be defined as '%s' type" % basic_type.value)
 
         # funDeclaration
         elif node_obj.node_kind is NodeKind.FUN_DECLARE_K:
             # 函数声明是否有返回值并检查返回值类型
             basic_type = node_obj.basic_type
             # 返回类型为void和int都要进行检查
-            compound_stmt = node_obj.child[5]  # funDeclaration : typeSpecifier ID LPAREN params RPAREN compoundStmt
-            return_stmt = self.get_return_stmt_from_compound_stmt(compound_stmt)
+            compound_stmt = node_obj.child[2]  # funDeclaration ~ [ID, params, compoundStmt]
+            return_stmt = self.get_return_stmt_from_compound_stmt(compound_stmt)  # returnStmt ~ [(expression)]
             if return_stmt is None:  # 没有返回值，且函数声明的返回类型不为void，输出错误信息
                 if basic_type is not BasicType.VOID:
-                    self.error_msg("Semantic error", "Function", node_obj.child[1].name,
-                                   node_obj.child[1].lineno,
+                    self.error_msg("Semantic error", "Function", node_obj.child[0].name,
+                                   node_obj.child[0].lineno,
                                    "need to return a '%s' value" % basic_type.value)
             else:  # 有返回值，且函数声明的返回类型与返回值的类型不同，输出错误信息
                 if not (return_stmt.node_kind is NodeKind.RETURN_K
-                        and return_stmt.child[1].basic_type is basic_type):
-                    self.error_msg("Semantic error", "Function", node_obj.child[1].name,
-                                   node_obj.child[1].lineno,
+                        and return_stmt.child[0].basic_type is basic_type):
+                    self.error_msg("Semantic error", "Function", node_obj.child[0].name,
+                                   node_obj.child[0].lineno,
                                    "need to return a '%s' value" % basic_type.value)
 
         # selectionStmt or iterationStmt
         elif node_obj.node_kind is NodeKind.SELECTION_K or node_obj.node_kind is NodeKind.ITERATION_K:
             # 检查if和while语句中的表达式类型
-            if not (node_obj.child[2].basic_type is BasicType.BOOL or node_obj.child[2].basic_type is BasicType.INT):
-                # selectionStmt : IF LPAREN expression RPAREN...
-                # iterationStmt : WHILE LPAREN expression RPAREN statement
-                self.error_msg("Type error", "Statement", node_obj.child[0].name,
-                               node_obj.child[2].lineno,
+            if not (node_obj.child[0].basic_type is BasicType.BOOL or node_obj.child[0].basic_type is BasicType.INT):
+                # selectionStmt ~ [expression, ...]
+                # iterationStmt ~ [expression, ...]
+                statement_name = "if" if node_obj.node_kind is NodeKind.SELECTION_K else "while"
+                self.error_msg("Type error", "Statement", statement_name,
+                               node_obj.lineno,
                                "the result of the expression is a '%s' value"
-                               % node_obj.child[2].basic_type.value)
+                               % node_obj.child[0].basic_type.value)
 
         # simpleExpression
         elif node_obj.node_kind is NodeKind.COMPARE_K:
-            if len(node_obj.child) is 3:  # simpleExpression : additiveExpression relop additiveExpression
+            if len(node_obj.child) is 3:  # simpleExpression ~ [additiveExpression, relop, additiveExpression]
                 if not (node_obj.child[0].basic_type is BasicType.INT and
-                        node_obj.child[2].basic_type is BasicType.INT):
-                    self.error_msg("Type error", "Expression", node_obj.child[1].name,
-                                   node_obj.child[0].lineno,
-                                   "the result of the expression require a 'int' or 'bool' value, not '%s'"
-                                   % node_obj.child[2].basic_type.value)
-            elif len(node_obj.child) is 1:  # simpleExpression | additiveExpression
+                        node_obj.child[2].basic_type is BasicType.INT):  # 表达式左右值
+                    self.error_msg("Type error", "Comparison Expression", node_obj.child[1].name,
+                                   node_obj.child[1].lineno,
+                                   "not supported between value of '%s' and '%s'"
+                                   % (node_obj.child[0].basic_type.value, node_obj.child[2].basic_type.value))
+            elif len(node_obj.child) is 1:  # simpleExpression ~ [additiveExpression]
                 if not (node_obj.child[0].basic_type is (BasicType.INT or BasicType.BOOL)):
-                    self.error_msg("Type error", "Expression", '',
+                    self.error_msg("Type error", "Comparison Expression", '',
                                    node_obj.child[0].lineno,
-                                   "the result of the expression require a 'int' or 'bool' value, not '%s'"
-                                   % node_obj.child[2].basic_type.value)
+                                   "not supported '%s' value"
+                                   % node_obj.child[0].basic_type.value)
 
         # assignExpression
         elif node_obj.node_kind is NodeKind.ASSIGN_K:
-            if node_obj.child[2].basic_type is not BasicType.INT:  # expression : var ASSIGN expression
-                print(node_obj.child[2].child[0].name)
-                self.error_msg("Type error", "Expression", '',
-                               node_obj.child[2].lineno,
-                               "the result of the expression require a 'int' value, not '%s'"
-                               % node_obj.child[2].basic_type.value)
+            if node_obj.child[1].basic_type is not BasicType.INT:  # assignExpression ~ [var, expression]
+                self.error_msg("Type error", "Assignment Expression", '=',
+                               node_obj.child[1].lineno,
+                               "not supported '%s' value"
+                               % node_obj.child[1].basic_type.value)
 
         # additiveExpression or term
         elif node_obj.node_kind is NodeKind.ARITHMETIC_K:
-            # additiveExpression : additiveExpression addop term
-            # term : term mulop factor
-            child_len = len(node_obj.child)
-            for i in range(0, child_len, 2):
-                # 检查运算符左右的值是否为int（对于二元运算符，另一种方式是运算符作为树根，针对左右子树进行类型判断）
-                if node_obj.child[i].basic_type is not BasicType.INT:
-                    self.error_msg("Type error", "Expression", '',
-                                   node_obj.child[i].lineno,
-                                   "the result of the expression require a 'int' value, not '%s'"
-                                   % node_obj.child[i].basic_type.value)
-                    break
+            # additiveExpression ~ [additiveExpression, addop, term]
+            # term ~ [term, mulop, factor]
+            # 检查运算符左右的值是否为int（对于二元运算符，另一种方式是运算符作为树根，针对左右子树进行类型判断）
+            if not (node_obj.child[0].basic_type is BasicType.INT and
+                    node_obj.child[2].basic_type is BasicType.INT):
+                self.error_msg("Type error", "Arithmetic Expression", node_obj.child[1].name,
+                               node_obj.child[0].lineno,
+                               "not supported between value of '%s' and '%s'"
+                               % (node_obj.child[0].basic_type.value, node_obj.child[2].basic_type.value))
 
         # var
-        elif node_obj.node_kind is NodeKind.VAR_K:
+        elif node_obj.node_kind is NodeKind.VAR_K:  # var ~ [ID, (expression)]
             symbol, scope = st_lookup(node_obj.child[0].name, self.current_scope.id)
             if symbol is not None:
                 if symbol.basic_type is BasicType.ARRAY:  # 声明为arr，使用元素为int
@@ -342,7 +356,7 @@ class MySemanticAnalyzer:
                     if not (symbol.basic_type is node_obj.basic_type):
                         self.error_msg("Type error", "Variable", node_obj.child[0].name,
                                        node_obj.child[0].lineno,
-                                       "declared as a '%s' value at line %d, not '%s'"
+                                       "already been defined as a '%s' value at line %d, not '%s'"
                                        % (symbol.basic_type.value, symbol.lines[0], node_obj.basic_type.value))
 
     def type_check(self, syntax_tree_node_obj):

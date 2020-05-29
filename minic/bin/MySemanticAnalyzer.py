@@ -125,19 +125,20 @@ class MySemanticAnalyzer:
             symbol, scope = st_lookup(node_obj.child[0].name, self.current_scope.id)
             if scope is not self.current_scope:  # 在当前作用域中不存在此声明
                 # 新定义变量，加入到当前作用域符号表中
-                st_insert(node_obj.child[0].name, self.location, NodeKind.FUNC_K,
+                symbol, scope = st_insert(node_obj.child[0].name, self.location, NodeKind.FUNC_K,
                           node_obj.basic_type, len(node_obj.child[1].child), node_obj.child[0].lineno,
                           self.current_scope.id, self.current_scope.level)
                 self.location += 1
 
                 # params
                 params = node_obj.child[1]
+                tmp_scope_id = self.scope_id + 1  # peek到下一个作用域，作用域id先加1
+                next_scope = update_scope(tmp_scope_id, self.current_scope.level + 1)
+                symbol.included_scope = next_scope  # 函数声明关联下一个作用域
                 for param in params.child:  # params ~ [param, param, ...]
                     # param ~ [ID]
-                    tmp_scope_id = self.scope_id + 1  # peek到下一个作用域，作用域id先加1
                     symbol, scope = st_lookup(param.child[0].name, tmp_scope_id)
-                    if scope is not update_scope(tmp_scope_id,
-                                                 self.current_scope.level + 1):  # 在下一作用域中不存在此声明
+                    if scope is not next_scope:  # 在下一作用域中不存在此声明
                         # 新定义变量，加入到当前作用域符号表中
                         st_insert(param.child[0].name, self.location, NodeKind.VAR_K,
                                   param.basic_type, 1, param.child[0].lineno,
@@ -158,9 +159,6 @@ class MySemanticAnalyzer:
                                node_obj.child[0].lineno, "not defined")
             else:
                 if symbol.id_kind is NodeKind.FUNC_K:  # 确定被调用函数的返回类型（只有call才在语义分析时确定basic_type）
-                    if symbol.size != len(node_obj.child[1].child):  # 检查参数列表长度是否匹配
-                        self.error_msg("Semantic error", "Call", node_obj.child[0].name,
-                                       node_obj.child[0].lineno, "list of argument not match")
                     node_obj.basic_type = symbol.basic_type
                     # 符号表中已存在该变量，只追加行号
                     st_insert(symbol.name, 0, symbol.id_kind, symbol.basic_type,
@@ -350,7 +348,7 @@ class MySemanticAnalyzer:
             if symbol is not None:
                 if symbol.basic_type is BasicType.ARRAY:  # 声明为arr，使用元素为int
                     if len(node_obj.child) < 2:
-                        self.error_msg("Type error", "Variable", node_obj.child[0].name,
+                        self.error_msg("Semantic error", "Variable", node_obj.child[0].name,
                                        node_obj.child[0].lineno, "array index missing?")
                 else:
                     if not (symbol.basic_type is node_obj.basic_type):
@@ -358,6 +356,22 @@ class MySemanticAnalyzer:
                                        node_obj.child[0].lineno,
                                        "already been defined as a '%s' value at line %d, not '%s'"
                                        % (symbol.basic_type.value, symbol.lines[0], node_obj.basic_type.value))
+
+        # call
+        elif node_obj.node_kind is NodeKind.CALL_K:   # call ~ [ID, args]
+            symbol, scope = st_lookup(node_obj.child[0].name, self.current_scope.id)
+            arg_count = len(node_obj.child[1].child)
+            if symbol.size != arg_count:  # 检查参数列表长度是否匹配
+                self.error_msg("Semantic error", "Call", node_obj.child[0].name,
+                               node_obj.child[0].lineno, "list of argument not match")
+            else:
+                for i in (0, arg_count-1):  # 检查每一个参数
+                    expression = node_obj.child[1].child[i]  # args ~ [expression, expression, ...]
+                    # 在函数声明包裹的作用域的符号表查找参数
+                    param_symbol = symbol.included_scope.lookup_symbol_by_index(i)  # 函数声明的参数符号会在符号表最前
+                    if param_symbol.basic_type is not expression.basic_type:  # 检查参数类型是否匹配
+                        self.error_msg("Semantic error", "Call", node_obj.child[0].name,
+                                       node_obj.child[0].lineno, "type of argument not match")
 
     def type_check(self, syntax_tree_node_obj):
         """后序遍历进行类型检查
@@ -394,7 +408,7 @@ if __name__ == '__main__':
            Algorithm to compute gcd. */
         int a[20];
         
-        int gcd (int u, int v[])
+        int gcd (int u, int v)
         {   if (v == 0)return u;
             if (v == 0)return u;
             else { 

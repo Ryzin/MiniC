@@ -27,6 +27,7 @@ class Symbol(object):
         id_kind: NodeKind类的枚举类型（func\var）
         basic_type: BasicType类的枚举类型（arr指针，其引用的memloc与原指针memloc相同）
         size: 数组大小/函数参数个数
+        include_scope: 函数声明下的作用域引用
     """
     name = None
     lines = None
@@ -34,6 +35,7 @@ class Symbol(object):
     id_kind = None
     basic_type = None
     size = None
+    included_scope = None
 
     def __init__(self, symbol_name, mem_loc, id_kind, basic_type, size, lineno):
         self.name = symbol_name
@@ -56,7 +58,7 @@ class SymbolTable(object):
     symbols = None
 
     def __init__(self):
-        self.symbols = {}
+        self.symbols = collections.OrderedDict()  # 顺序字典帮助定位函数声明中的参数
 
     def insert_symbol(self, symbol):
         """向符号表插入符号
@@ -75,9 +77,17 @@ class SymbolTable(object):
         """在符号表查找符号并返回其引用
 
         :param symbol_name: 符号名
-        :return:
+        :return: 符号对象引用
         """
         return self.symbols.get(symbol_name)
+
+    def lookup_symbol_by_index(self, index):
+        """在符号表查找符号并返回其引用
+
+        :param index: 索引
+        :return: 符号对象引用
+        """
+        return list(self.symbols.values())[index]
 
 
 class Scope(object):
@@ -107,10 +117,15 @@ class Scope(object):
         """向符号表插入符号"""
         symbol = Symbol(symbol_name, mem_loc, id_kind, basic_type, size, lineno)
         self.symbol_table.insert_symbol(symbol)
+        return symbol
 
     def lookup_symbol(self, symbol_name):
         """在符号表查找符号并返回其引用"""
         return self.symbol_table.lookup_symbol(symbol_name)
+
+    def lookup_symbol_by_index(self, index):
+        """在符号表查找符号并返回其引用"""
+        return self.symbol_table.lookup_symbol_by_index(index)
 
     def print_symbol_table(self):
         """打印作用域信息和符号表信息"""
@@ -171,9 +186,21 @@ def update_scope(scope_id, scope_level, enclosing_scope=None):
 
 
 def st_insert(symbol_name, mem_loc, id_kind, basic_type, size, lineno, scope_id, scope_level):
-    """向指定作用域的符号表插入符号"""
+    """向指定作用域的符号表插入符号
+
+    :param symbol_name: 变量名
+    :param mem_loc: 内存位置
+    :param id_kind: NodeKind枚举类型
+    :param basic_type: BasicType枚举类型
+    :param size: 数组大小/函数参数个数
+    :param lineno: 行号
+    :param scope_id: 作用域id
+    :param scope_level: 作用域级别
+    :return: 由symbol对象引用和scope对象引用组成的元组
+    """
     scope = update_scope(scope_id, scope_level)
-    scope.insert_symbol(symbol_name, mem_loc, id_kind, basic_type, size, lineno)
+    symbol = scope.insert_symbol(symbol_name, mem_loc, id_kind, basic_type, size, lineno)
+    return symbol, scope
 
 
 def st_lookup(symbol_name, scope_id):
@@ -224,4 +251,5 @@ if __name__ == '__main__':
 
     # print(scope_map)
     print_scope()
-    print(st_lookup("x", 10001))  # abc中找不到，向外找到了global中声明的x
+    symbol, scope = st_lookup("x", 10000)
+    print(scope.lookup_symbol_by_index(0))

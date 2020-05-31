@@ -27,7 +27,7 @@ class Symbol(object):
         id_kind: NodeKind类的枚举类型（func\var）
         basic_type: BasicType类的枚举类型（arr指针，其引用的memloc与原指针memloc相同）
         size: 数组大小/函数参数个数
-        include_scope: 函数声明下的作用域引用
+        included_scope: 函数声明下的作用域引用
     """
     name = None
     lines = None

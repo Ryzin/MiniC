@@ -48,8 +48,8 @@ class OpCode(IntEnum):
     OP_RRLIM = 7  # RR操作码的范围
 
     # RM指令(opcode r,d(s))
-    OP_LD = 8  # reg[r] = dMem[d + reg[s]](将d + reg[s]中的值装入r)
-    OP_ST = 9  # mem(d + reg[s]) = reg[r](将r的值存入位置d + reg[s])
+    OP_LD = 8  # reg[r] = d_mem[d + reg[s]](将d + reg[s]中的值装入r)
+    OP_ST = 9  # d_mem[d + reg[s]] = reg[r](将r的值存入位置d + reg[s])
     OP_RMLIM = 10  # RM操作码的范围
 
     # RA指令(opcode r,d(s))
@@ -168,7 +168,7 @@ def get_ch():
     """
     global in_col, line_len, ch, in_line
 
-    in_col = in_col + 1
+    in_col += 1
     if in_col < line_len:  # 更新ch
         ch = in_line[in_col]
     else:
@@ -185,7 +185,7 @@ def non_blank():
     global in_col, line_len, ch
 
     while in_col < line_len and in_line[in_col] == ' ':  # 跳过空格
-        in_col = in_col + 1
+        in_col += 1
     if in_col < line_len:  # 更新ch
         ch = in_line[in_col]
         return True
@@ -221,7 +221,7 @@ def get_num():
             temp = True
             term = term * 10 + int(ch)
             get_ch()
-        num = num + (term * sign)  # 计算结果
+        num += (term * sign)  # 计算结果
 
         if not (non_blank() and (ch == '+' or ch == '-')):  # 接下来是否还有计算
             break
@@ -318,7 +318,7 @@ def read_instructions():
     for s in str_list:
         in_line = s
         in_col = 0
-        lineno = lineno + 1
+        lineno += 1
         line_len = len(in_line)  # -1 is unnecessary
 
         if non_blank() and in_line[in_col] != '*':  # 跳过空格和注释行
@@ -615,7 +615,7 @@ def do_command():
         else:  # 需要已经扫描到结尾
             while 0 <= i_loc < IADDR_SIZE and print_cnt > 0:
                 write_instruction(i_loc)
-                i_loc = i_loc + 1
+                i_loc += 1
                 print_cnt = print_cnt - 1
 
     elif command == 'd':  # 打印自d_loc位置开始的print_cnt个d_mem元素
@@ -629,7 +629,7 @@ def do_command():
         else:  # 需要已经扫描到结尾
             while 0 <= d_loc < DADDR_SIZE and print_cnt > 0:
                 print("%5d: %5d" % (d_loc, d_mem[d_loc]))
-                d_loc = d_loc + 1
+                d_loc += 1
                 print_cnt = print_cnt - 1
 
     elif command == 'c':  # 重置解释器以便再次执行程序
@@ -657,7 +657,7 @@ def do_command():
                 if trace_flag:
                     write_instruction(i_loc)
                 step_result = step_tm()
-                step_cnt = step_cnt + 1
+                step_cnt += 1
             if i_count_flag:  # 输出已执行指令条数
                 print("Number of instructions executed = %d" % step_cnt)
         else:

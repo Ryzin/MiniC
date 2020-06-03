@@ -16,11 +16,8 @@ from MySymbolTable import st_lookup
 
 
 emit_util = MyCodeEmittingUtil(True)
-tmp_offset = 0  # 临时变量栈的顶部指针，对emit_rm函数的调用与压入和弹出该栈相对应
 # 初始为用作下一个可用临时变量位置对于内存顶部 (由mp寄存器指出）的偏移
-current_main_loc = 0  # 指示main函数的入口点
-
-
+tmp_offset = 0  # 临时变量栈的顶部指针，对emit_rm函数的调用与压入和弹出该栈相对应
 global_scope_id = 10000000  # 作用域id计数器
 
 
@@ -41,7 +38,7 @@ def code_generate(node_obj, scope_id):
     # loc = None  # int，变量地址并以gp寄存器基准的偏移装入或存储值
 
     # print(scope_id)
-    global global_scope_id, tmp_offset, current_main_loc
+    global global_scope_id, tmp_offset
 
     if node_obj.node_kind is NodeKind.LBRACE_K:
         global_scope_id += 1
@@ -57,37 +54,35 @@ def code_generate(node_obj, scope_id):
     elif node_obj.node_kind is NodeKind.FUN_DECLARE_K:
         # funDeclaration ~ [ID, params, compoundStmt]
         if emit_util.trace_code:
-            emit_util.emit_comment("-> func")
+            emit_util.emit_comment("-> Func")
 
         p1 = node_obj.child[0]  # ID
         p2 = node_obj.child[1]  # params
         p3 = node_obj.child[2]  # compoundStmt
 
         if p1.name == "main":
-            current_main_loc = emit_util.emit_skip(0)  # 不跳过位置，用于之后的转移引用（程序入口点）
+            emit_util.emit_comment("main: program entry point")
 
-        # 保存函数过程入口点至内存
-        symbol, scope = st_lookup(node_obj.child[0].name, scope_id)
-        loc = symbol.mem_loc
-        emit_util.emit_rm("LDC", MyRegister.AC0, 1, 0, "load const")  # 直接取值指令
-        emit_util.emit_ro("ADD", MyRegister.AC0, MyRegister.PC, MyRegister.AC0, "func: reg[PC] + 1")
-        emit_util.emit_rm("ST", MyRegister.AC0, loc, MyRegister.GP, "func: store func entry point")  # 存值指令
+        # 保存函数过程入口点至符号表
+        symbol, scope = st_lookup(p1.name, scope_id)
+        symbol.mem_loc = emit_util.emit_skip(0)  # 保存指令位置
 
-        # 生成函数体的代码
+        # 生成函数体的代码（返回值保存至寄存器AC0）
         code_generate(p3, global_scope_id)
 
-        # 最后退栈取返回点，跳转回调用位置
-        tmp_offset += 1
-        emit_util.emit_rm("LD", MyRegister.AC0, tmp_offset, MyRegister.MP, "load return point")
-        emit_util.emit_rm("LDA", MyRegister.PC, 0, MyRegister.AC0, "func: jmp back call")  # 无条件转移指令
+        if p1.name != "main":
+            # 从函数栈栈顶栈帧中取返回点，更新活动记录，跳转回调用位置（返回点保存至寄存器AC1）
+            emit_util.emit_ms("LDR", MyRegister.AC1, 0, 0, "func: load return point from top frame")  # 取返回点指令
+            emit_util.emit_ms("POM", 0, 0, 0, "func: pop top frame and restore new activity record")  # 函数栈退栈指令
+            emit_util.emit_rm("LDA", MyRegister.PC, 0, MyRegister.AC1, "func: jmp back call")  # 无条件转移指令
 
         if emit_util.trace_code:
-            emit_util.emit_comment("<- func")
+            emit_util.emit_comment("<- Func")
 
     elif node_obj.node_kind is NodeKind.COMPOUND_K:
         # compoundStmt ~ [LBRACE, localDeclarations, statementList, RBRACE]
         if emit_util.trace_code:
-            emit_util.emit_comment("-> compound")
+            emit_util.emit_comment("-> Compound")
 
         p1 = node_obj.child[0]  # LBRACE
         # p2 = node_obj.child[1]  # localDeclarations
@@ -109,12 +104,12 @@ def code_generate(node_obj, scope_id):
         # code_generate(p4)
 
         if emit_util.trace_code:
-            emit_util.emit_comment("<- compound")
+            emit_util.emit_comment("<- Compound")
 
     elif node_obj.node_kind is NodeKind.SELECTION_K:
         # selectionStmt ~ [expression, statement, (statement)]
         if emit_util.trace_code:
-            emit_util.emit_comment("-> if")
+            emit_util.emit_comment("-> If")
 
         p1 = node_obj.child[0]  # expression
         p2 = node_obj.child[1]  # statement
@@ -146,12 +141,12 @@ def code_generate(node_obj, scope_id):
         emit_util.emit_restore()
 
         if emit_util.trace_code:
-            emit_util.emit_comment("<- if")
+            emit_util.emit_comment("<- If")
 
     elif node_obj.node_kind is NodeKind.ITERATION_K:
         # iterationStmt ~ [expression, statement]
         if emit_util.trace_code:
-            emit_util.emit_comment("-> while")
+            emit_util.emit_comment("-> While")
 
         p1 = node_obj.child[0]  # expression
         p2 = node_obj.child[1]  # statement
@@ -177,98 +172,99 @@ def code_generate(node_obj, scope_id):
         emit_util.emit_restore()
 
         if emit_util.trace_code:
-            emit_util.emit_comment("<- while")
+            emit_util.emit_comment("<- While")
 
     elif node_obj.node_kind is NodeKind.RETURN_K:
         # returnStmt ~ [expression]
         if emit_util.trace_code:
-            emit_util.emit_comment("<- return")
+            emit_util.emit_comment("<- Return")
 
         # 保存返回值到寄存器AC0
         if node_obj.child is not None:  # 有返回值
             code_generate(node_obj.child[0], global_scope_id)
 
         if emit_util.trace_code:
-            emit_util.emit_comment("<- return")
+            emit_util.emit_comment("<- Return")
 
     elif node_obj.node_kind is NodeKind.ASSIGN_K:
         # expression ~ [var, expression]
         if emit_util.trace_code:
-            emit_util.emit_comment("-> assign")
+            emit_util.emit_comment("-> Assign")
+
+        p1 = node_obj.child[0]  # ID
+        p2 = node_obj.child[1]  # expression
 
         # 生成expression代码（计算值保存在寄存器AC0）
-        code_generate(node_obj.child[2], global_scope_id)  # expression
+        code_generate(p2, global_scope_id)  # expression
 
         # 保存值
-        var = node_obj.child[0]
-        symbol, scope = st_lookup(var.child[0].name, scope_id)  # var ~ [ID, (expression)]
+        symbol, scope = st_lookup(p1.child[0].name, scope_id)  # var ~ [ID, (expression)]
         loc = symbol.mem_loc
-        offset = 0 if len(var.child) == 1 else int(var.child[1].name)
+        offset = 0 if len(p1.child) == 1 else int(p1.child[1].name)
         emit_util.emit_rm("ST", MyRegister.AC0, loc + offset, MyRegister.GP, "assign: store value")  # 存值指令
 
         if emit_util.trace_code:
-            emit_util.emit_comment("<- assign")
+            emit_util.emit_comment("<- Assign")
 
     elif node_obj.node_kind is NodeKind.CALL_K:
         # call ~ [ID, args]
         if emit_util.trace_code:
-            emit_util.emit_comment("-> call")
+            emit_util.emit_comment("-> Call")
 
         p1 = node_obj.child[0]  # ID
         p2 = node_obj.child[1]  # argList
 
         # 查找函数声明
         symbol, scope = st_lookup(p1.name, scope_id)  # var ~ [ID, (expression)]
-        loc = symbol.mem_loc
+        loc = symbol.mem_loc  # 此loc保存的是指令位置
         arg_count = len(p2.child)
+
+        # 函数栈压入新栈帧
+        emit_util.emit_ms("PSM", 0, 0, 0, "call: push new frame to method stack")
 
         # 生成指示参数计算的指令（准备调用函数）
         for i in (0, arg_count-1):  # args ~ [expression, expression, ...]
             code_generate(p2.child[i], global_scope_id)  # expression
             param_symbol = symbol.included_scope.lookup_symbol_by_index(i)
-            emit_util.emit_rm("ST", MyRegister.AC0, param_symbol.mem_loc, MyRegister.GP, "call: store arg")
+            emit_util.emit_ms("PSA", MyRegister.AC0, param_symbol.mem_loc, 0, "call: store new arg to top frame")
 
-        # 转移到函数过程（从函数名对应的内存位置取入口点的值）
-        emit_util.emit_rm("LD", MyRegister.AC0, loc, MyRegister.GP, "load func entry point")  # 取值指令
-        emit_util.emit_rm("LDA", MyRegister.PC, 0, MyRegister.AC0, "call: jmp to func")  # 无条件转移指令
+        # 在函数栈栈顶的栈帧中设置返回点（跳过以下跳转指令）
+        emit_util.emit_ms("STR", MyRegister.PC, 1, 0, "call: store return point to top frame")  # 存返回点指令
 
-        # 返回点压栈（返回点为最后的指令位置）
-        tmp_offset -= 1
-        emit_util.emit_rm("LDC", MyRegister.AC0, 1, 0, "load const")  # 直接取值指令
-        emit_util.emit_ro("ADD", MyRegister.AC0, MyRegister.PC, MyRegister.AC0, "func: reg[PC] + 1")
-        emit_util.emit_rm("ST", MyRegister.AC0, tmp_offset, MyRegister.MP, "call: push return point")
+        # 转移到函数过程
+        emit_util.emit_rm_abs("LDA", MyRegister.PC, loc, "call: jmp to func")  # 无条件转移指令
 
         if emit_util.trace_code:
-            emit_util.emit_comment("<- call")
+            emit_util.emit_comment("<- Call")
 
     elif node_obj.node_kind is NodeKind.INPUT_K:
         # call ~ [INPUT, args]
         if emit_util.trace_code:
-            emit_util.emit_comment("-> input")
+            emit_util.emit_comment("-> Input")
 
         # symbol, scope = st_lookup(node_obj.name, scope_id)
         # loc = symbol.mem_loc
         # emit_util.emit_rm("ST", MyRegister.AC0, loc, MyRegister.GP, "read: store value")
 
         # 仅将值保存到寄存器AC0，等待其它指令取值
-        emit_util.emit_ro("IN", MyRegister.AC0, 0, 0, "read integer value")  # 输入指令
+        emit_util.emit_ro("IN", MyRegister.AC0, 0, 0, "input: read integer value")  # 输入指令
 
         if emit_util.trace_code:
-            emit_util.emit_comment("<- input")
+            emit_util.emit_comment("<- Input")
 
     elif node_obj.node_kind is NodeKind.OUTPUT_K:
         # outputStmt ~ [expression]
         if emit_util.trace_code:
-            emit_util.emit_comment("-> output")
+            emit_util.emit_comment("-> Output")
 
         expression = node_obj.child[0]
 
         # 生成expression的代码，保存值到寄存器AC0，等待输出
         code_generate(expression, global_scope_id)
-        emit_util.emit_ro("OUT", MyRegister.AC0, 0, 0, "write ac0")  # 输出指令
+        emit_util.emit_ro("OUT", MyRegister.AC0, 0, 0, "output: write ac0")  # 输出指令
 
         if emit_util.trace_code:
-            emit_util.emit_comment("<- output")
+            emit_util.emit_comment("<- Output")
 
     elif node_obj.node_kind is NodeKind.CONST_K:
         # NUM ~ []
@@ -276,7 +272,7 @@ def code_generate(node_obj, scope_id):
             emit_util.emit_comment("-> Const")
 
         # 生成取常量值的代码
-        emit_util.emit_rm("LDC", MyRegister.AC0, int(node_obj.name), 0, "load const")  # 直接取值指令
+        emit_util.emit_rm("LDC", MyRegister.AC0, int(node_obj.name), 0, "const: load const")  # 直接取值指令
 
         if emit_util.trace_code:
             emit_util.emit_comment("<- Const")
@@ -289,27 +285,27 @@ def code_generate(node_obj, scope_id):
         symbol, scope = st_lookup(node_obj.child[0].name, scope_id)
         loc = symbol.mem_loc
         if len(node_obj.child) is 1:  # 普通变量
-            emit_util.emit_rm("LD", MyRegister.AC0, loc, MyRegister.GP, "load id value")  # 取值指令
+            emit_util.emit_rm("LD", MyRegister.AC0, loc, MyRegister.GP, "var: load id value")  # 取值指令
         else:  # 数组元素
             # 生成代码，将loc压栈
-            tmp_offset -= 1
             emit_util.emit_rm("ST", MyRegister.AC0, tmp_offset, MyRegister.MP, "var: push loc")
+            tmp_offset -= 1
 
             # 生成expression的代码，数组索引值保存到寄存器AC0
             code_generate(node_obj.child[1], global_scope_id)  # expression
 
             # 退栈取loc，保存至寄存器AC1
             tmp_offset += 1
-            emit_util.emit_rm("LD", MyRegister.AC1, tmp_offset, MyRegister.MP, "load loc")
+            emit_util.emit_rm("LD", MyRegister.AC1, tmp_offset, MyRegister.MP, "var: load loc")
 
             # 计算loc + offset，保存至寄存器AC0
-            emit_util.emit_ro("ADD", MyRegister.AC0, MyRegister.AC1, MyRegister.AC0, "loc + offset")
+            emit_util.emit_ro("ADD", MyRegister.AC0, MyRegister.AC1, MyRegister.AC0, "var: loc + offset")
 
             # 计算reg[AC0] + reg[GP]，保存至寄存器AC0
-            emit_util.emit_ro("ADD", MyRegister.AC0, MyRegister.GP, MyRegister.AC0, "reg[AC0] + reg[GP]")
+            emit_util.emit_ro("ADD", MyRegister.AC0, MyRegister.GP, MyRegister.AC0, "var: reg[AC0] + reg[GP]")
 
             # 从d_mem[0 + reg[AC0]]中取值（即d_mem[(loc + offset) + reg[GP]]）
-            emit_util.emit_rm("LD", MyRegister.AC0, 0, MyRegister.AC0, "load id value")  # 取值指令
+            emit_util.emit_rm("LD", MyRegister.AC0, 0, MyRegister.AC0, "var: load id value")  # 取值指令
 
         if emit_util.trace_code:
             emit_util.emit_comment("<- Var")
@@ -328,8 +324,8 @@ def code_generate(node_obj, scope_id):
         code_generate(p1, global_scope_id)
 
         # 生成代码，将左值压栈
-        tmp_offset -= 1
         emit_util.emit_rm("ST", MyRegister.AC0, tmp_offset, MyRegister.MP, "op: push left")
+        tmp_offset -= 1
 
         # 生成右值的代码，值保存到寄存器AC0
         code_generate(p2, global_scope_id)
@@ -397,11 +393,11 @@ def init(node_obj):
     :param node_obj: 语法树节点
     :return:
     """
-    global global_scope_id, current_main_loc
+    global global_scope_id
 
     # 生成TINY程序的简单说明
     emit_util.emit_comment("TINY Compilation to TM Code")
-    emit_util.emit_comment("File: SAMPLE.tm")
+    emit_util.emit_comment("File: SAMPLE.tm")  # TODO
 
     # 生成标准序言，设置启动时的运行时环境
     emit_util.emit_comment("Standard prelude:")
@@ -415,12 +411,16 @@ def init(node_obj):
     saved_loc = emit_util.emit_skip(1)
     emit_util.emit_comment("global: jump to main")
 
+    scope_id = global_scope_id
+
     # 通过语法树根节点递归生成代码
-    code_generate(node_obj, global_scope_id)
+    code_generate(node_obj, scope_id)
 
     # 回填转移指令到saved_loc
     emit_util.emit_back_fill(saved_loc)  # 设置当前指令位置emit_loc为saved_loc
-    emit_util.emit_rm_abs("LDA", MyRegister.PC, current_main_loc, "global: jmp to main")  # 无条件转移指令
+    symbol, scope = st_lookup("main", scope_id)  # 10000000
+    loc = symbol.mem_loc
+    emit_util.emit_rm_abs("LDA", MyRegister.PC, loc, "global: jmp to main")  # 无条件转移指令
     emit_util.emit_restore()  # 恢复当前指令位置emit_loc
 
     # 终止程序
@@ -438,12 +438,11 @@ if __name__ == '__main__':
     # 构建词法分析器
     lexer = MyLexer()
 
-    # 测试用例1
+    # 测试用例
     source_str = """
 int gcd (int u, int v)
-{   if (v == 0)return u;
-    else return gcd(v, gcd(v, u-u/v*v));
-    /* u-u/v*v == u mod v */
+{   if (v == 0) return u;
+    else return v;
 }
 
 void main() {
@@ -452,7 +451,7 @@ void main() {
     y = input();
     output(gcd(x, y));
 }
-        """
+"""
 
     # 词法分析器获得输入
     lexer.input(source_str)
@@ -473,8 +472,11 @@ void main() {
     my_semantic_analyzer.build_symbol_table(root_node)
     my_semantic_analyzer.type_check(root_node)
 
-    # print_scope()
+    # 打印语法树
     # root_node.print()
 
     # 代码生成初始化
     init(root_node)
+
+    # 打印作用域和符号表信息
+    # print_scope()

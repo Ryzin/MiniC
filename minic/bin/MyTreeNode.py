@@ -42,7 +42,7 @@ class NodeKind(Enum):
     ARITHMETIC_K = 'ArithmeticK'
 
     # statement kind
-    EXP_K = 'ExpK'
+    # EXP_K = 'ExpK'  # 已过时
     COMPOUND_K = 'CompoundK'
     SELECTION_K = 'SelectionK'
     ITERATION_K = 'IterationK'

@@ -9,7 +9,7 @@
 @Date   : 2020/4/7 12:05
 @Desc   : 符号表的实现（最近嵌套作用域）
 """
-import collections
+from collections import OrderedDict
 
 
 scope_map = {}  # 作用域集合，便于快速获取作用域对象
@@ -58,7 +58,7 @@ class SymbolTable(object):
     symbols = None
 
     def __init__(self):
-        self.symbols = collections.OrderedDict()  # 顺序字典帮助定位函数声明中的参数
+        self.symbols = OrderedDict()  # 顺序字典帮助定位函数声明中的参数
 
     def insert_symbol(self, symbol):
         """向符号表插入符号
@@ -225,7 +225,7 @@ def st_lookup(symbol_name, scope_id):
 def print_scope():
     """打印作用域信息和符号表信息"""
     # 按作用域级别排序
-    ordered_map = collections.OrderedDict(sorted(scope_map.items(), key=lambda t: t[1].level))
+    ordered_map = OrderedDict(sorted(scope_map.items(), key=lambda t: t[1].level))
     for scope in ordered_map.values():
         # if len(scope.symbol_table.symbols) > 0:
             scope.print_symbol_table()

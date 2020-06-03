@@ -11,6 +11,7 @@
 """
 
 from enum import Enum, IntEnum
+from collections import OrderedDict
 
 
 # const
@@ -18,6 +19,7 @@ IADDR_SIZE = 1024  # 指令存储区大小
 DADDR_SIZE = 1024  # 内存数据区大小
 REGS_SIZE = 8  # 寄存器个数
 PC_REG = 7  # 程序计数器寄存器的在reg中的索引
+GP_REG = 5  # 全程指针寄存器的在reg中的索引
 
 
 class OpClass(Enum):
@@ -29,6 +31,7 @@ class OpClass(Enum):
     OPC_IRR = 'opcIRR'  # reg operands r,s,t
     OPC_IRM = 'opcIRM'  # reg r, mem d+s
     OPC_IRA = 'opcIRA'  # reg r, int d+s
+    OPC_IMS = 'opcIMS'  # stack i
 
 
 class OpCode(IntEnum):
@@ -63,6 +66,14 @@ class OpCode(IntEnum):
     OP_JNE = 18  # if reg[r] != 0 then reg[PC_REG] = d + reg[s]
     OP_RALIM = 19  # RA操作码的范围
 
+    # MS指令(opcode r,d,v)
+    OP_PSM = 20  # method_stack.push(Frame())
+    OP_POM = 21  # method_stack.pop()
+    OP_PSA = 22  # method_stack.peek().add_arg(d, reg[r])  # d为mem_loc
+    OP_STR = 23  # method_stack.peek().return_point = reg[r] + d
+    OP_LDR = 24  # reg[r] = method_stack.peek().return_point
+    OP_MSLIM = 25  # MS操作码的范围
+
 
 class StepResult(IntEnum):
     """执行结果类型枚举
@@ -75,6 +86,7 @@ class StepResult(IntEnum):
     SR_IMEM_ERR = 2
     SR_DMEM_ERR = 3
     SR_ZERODIVIDE = 4
+    SR_STACKVISIT_ERR = 5
 
 
 class Instruction:
@@ -82,6 +94,11 @@ class Instruction:
 
     用于配合i_mem，快速定位并获取指令的内容
 
+    Attributes:
+        op: 操作码类型枚举引用
+        arg1: 参数1
+        arg2: 参数2
+        arg3: 参数3
     """
     op = None
     arg1 = None
@@ -95,6 +112,68 @@ class Instruction:
         self.arg3 = arg3
 
 
+class Frame:
+    """栈帧类
+
+    用于配合method_stack，在函数调用时保存过程活动记录
+
+    Attributes:
+        return_point: 指令位置，指向原函数调用的地址
+        args: 实参列表
+    """
+    return_point = None
+    args = None
+
+    def __init__(self):
+        self.args = OrderedDict()
+
+    def add_arg(self, loc, value):
+        """字典添加元素"""
+        self.args[loc] = value
+
+    def get_arg(self, loc):
+        """字典按键获取元素"""
+        return self.args[loc]
+
+    def get_arg_by_index(self, index):
+        """字典按列表索引获取元素"""
+        return list(self.args.values())[index]
+
+
+class Stack:
+    """栈类
+
+    用于配合method_stack使用，保存多个栈帧
+
+    Attributes:
+        values: 列表，存放Frame对象引用
+    """
+    values = None
+
+    def __init__(self):
+        self.values = []
+
+    def push(self, value):
+        """压栈"""
+        self.values.append(value)
+
+    def pop(self):
+        """退栈"""
+        return self.values.pop()
+
+    def is_empty(self):
+        """判空"""
+        return self.size() == 0
+
+    def size(self):
+        """栈大小"""
+        return len(self.values)
+
+    def peek(self):
+        """取栈顶元素"""
+        return self.values[self.size() - 1]
+
+
 # vars
 i_loc = 0  # 当前指令存储区访问索引
 d_loc = 0  # 当前内存数据区访问索引
@@ -104,12 +183,16 @@ i_count_flag = False  # 指令条数跟踪
 i_mem = None  # 存放指令对象（Instruction）引用
 d_mem = None  # 存放内存数据（Int）
 reg = None  # 存放NO_REGS个寄存器值（Int）
+method_stack = None  # 函数栈
 
 op_code_tab = ["HALT", "IN", "OUT", "ADD", "SUB", "MUL", "DIV", "????",  # RR opcodes
                "LD", "ST", "????",  # RM opcodes
-               "LDA", "LDC", "JLT", "JLE", "JGT", "JGE", "JEQ", "JNE", "????"]  # RA opcodes
+               "LDA", "LDC", "JLT", "JLE", "JGT", "JGE", "JEQ", "JNE", "????",  # RA opcodes
+               "PSM", "POM", "PSA", "STR", "LDR", "????"]  # MS opcodes
 
-step_result_tab = ["OK", "Halted", "Instruction Memory Fault", "Data Memory Fault", "Division by 0"]
+step_result_tab = ["OK", "Halted", "Instruction Memory Fault", "Data Memory Fault",
+                   "Division by 0", "Method Stack Visit Fault"]
+
 
 in_line = None  # 存放一行字符的字符串
 source_str = None  # 读取的字符流
@@ -134,8 +217,10 @@ def get_op_class(c):
         return OpClass.OPC_IRR
     elif c <= OpCode.OP_RMLIM:  # <= 10
         return OpClass.OPC_IRM
-    else:  # <= 19
+    elif c <= OpCode.OP_RALIM:  # <= 19
         return OpClass.OPC_IRA
+    else:  # <= 25
+        return OpClass.OPC_IMS
 
 
 def write_instruction(loc):
@@ -150,9 +235,9 @@ def write_instruction(loc):
 
     print("%5d: " % loc, end="")
     if 0 <= loc < IADDR_SIZE:
-        print("%6s%3d," % (op_code_tab[i_mem[loc].op], i_mem[loc].arg1), end="")  # TODO
+        print("%6s%3d," % (op_code_tab[i_mem[loc].op], i_mem[loc].arg1), end="")
         op_class = get_op_class(i_mem[loc].op)
-        if op_class is OpClass.OPC_IRR:
+        if op_class is OpClass.OPC_IRR or OpClass.OPC_IMS:
             print("%1d,%1d" % (i_mem[loc].arg2, i_mem[loc].arg3), end="")
         elif op_class is OpClass.OPC_IRM or op_class is OpClass.OPC_IRA:
             print("%3d(%1d)" % (i_mem[loc].arg2, i_mem[loc].arg3), end="")
@@ -240,7 +325,7 @@ def get_word():
     word = ""
     temp = False
     if non_blank():
-        while ch.isalnum():  # TODO 是否为字母或数字
+        while ch.isalnum():  # 是否为字母或数字
             word += ch
             get_ch()
         temp = (len(word) != 0)
@@ -294,7 +379,7 @@ def read_instructions():
 
     :return: 当读取某一条指令发现错误时返回False，全部指令正确读取返回True
     """
-    global reg, REGS_SIZE, d_mem, i_mem, DADDR_SIZE, IADDR_SIZE, \
+    global reg, REGS_SIZE, d_mem, i_mem, method_stack, DADDR_SIZE, IADDR_SIZE, \
         source_str, str_list, line_len, in_line, in_col, num, word, op_code_tab
 
     lineno = 0  # 当前行号
@@ -310,6 +395,9 @@ def read_instructions():
 
     # 初始化reg
     reg = [0] * REGS_SIZE
+
+    # 初始化method_stack
+    method_stack = Stack()
 
     # 初始化str_list，从字符流得到分隔的字符串列表
     str_list = source_str.splitlines(False)  # 按照行('\r', '\r\n', \n')分隔，返回一个包含各行作为元素的列表，且不包含换行符
@@ -336,7 +424,7 @@ def read_instructions():
             # 根据前4个有效字符获得操作码枚举
             op = OpCode.OP_HALT  # OpCode.OP_HALT为0（最小），OpCode.OP_RALIM为19（最大）
             tmp_word = word[:4]  # 取左4位
-            while op < OpCode.OP_RALIM and op_code_tab[op][:4] != tmp_word:
+            while op < OpCode.OP_MSLIM and op_code_tab[op][:4] != tmp_word:
                 op = OpCode(op + 1)
             if op_code_tab[op][:4] != tmp_word:  # 确保不是因为遍历完OpCode而退出的循环
                 return error("Illegal opcode", lineno, loc)
@@ -376,6 +464,21 @@ def read_instructions():
                     return error("Bad second register", lineno, loc)
                 arg3 = num
 
+            elif op_class is OpClass.OPC_IMS:  # r,d,v
+                if (not get_num() or num < 0) or num >= REGS_SIZE:
+                    return error("Bad instruction location", lineno, loc)
+                arg1 = num
+                if not skip_ch(','):
+                    return error("Missing comma", lineno, loc)
+                if not get_num():
+                    return error("Bad displacement", lineno, loc)
+                arg2 = num
+                if not skip_ch(','):
+                    return error("Missing comma", lineno, loc)
+                if not get_num():
+                    return error("Bad value", lineno, loc)
+                arg3 = num
+
             # 转化为指令对象存储
             i_mem[loc].op = op
             i_mem[loc].arg1 = arg1
@@ -392,12 +495,14 @@ def step_tm():
 
     :return: 执行结果类型枚举
     """
-    global PC_REG, reg, IADDR_SIZE, in_line, in_col, i_mem, d_mem, line_len
+    global PC_REG, GP_REG, reg, IADDR_SIZE, in_line, in_col, i_mem, d_mem, line_len, method_stack
 
     r = None
     s = None
     t = None
     m = None
+    d = None
+    v = None
 
     # 从pc保存的指令位置取指，开始执行指令
     pc = reg[PC_REG]  # pc寄存器的值表示指令偏移
@@ -426,6 +531,11 @@ def step_tm():
         r = current_instruction.arg1
         s = current_instruction.arg3
         m = current_instruction.arg2 + reg[s]
+
+    elif op_class is OpClass.OPC_IMS:
+        r = current_instruction.arg1
+        d = current_instruction.arg2
+        v = current_instruction.arg3
 
     # 执行指令
     op = current_instruction.op
@@ -503,12 +613,43 @@ def step_tm():
         if reg[r] != 0:
             reg[PC_REG] = m
 
+    # MS Instructions
+    elif op is OpCode.OP_PSM:  # 压入一个栈帧
+        if 0 <= r <= IADDR_SIZE:
+            method_stack.push(Frame())
+
+    elif op is OpCode.OP_POM:  # 退出一个栈帧，同时更新当前活动记录
+        method_stack.pop()
+        if not method_stack.is_empty():
+            frame = method_stack.peek()
+            for arg in frame.args.items():
+                d_mem[arg[0]+reg[GP_REG]] = arg[1]
+
+    elif op is OpCode.OP_PSA:  # 为栈顶栈帧的参数列表增加一个参数，并更新d_mem
+        if method_stack.is_empty():
+            return StepResult.SR_STACKVISIT_ERR
+        frame = method_stack.peek()
+        frame.add_arg(d, reg[r])  # 更新参数列表
+        d_mem[d+reg[GP_REG]] = reg[r]  # 更新d_mem
+
+    elif op is OpCode.OP_STR:  # 设置栈顶栈帧的返回点
+        if method_stack.is_empty():
+            return StepResult.SR_STACKVISIT_ERR
+        frame = method_stack.peek()
+        frame.return_point = reg[r] + d
+
+    elif op is OpCode.OP_LDR:  # 获得栈顶栈帧的返回点
+        if method_stack.is_empty():
+            return StepResult.SR_STACKVISIT_ERR
+        frame = method_stack.peek()
+        reg[r] = frame.return_point
+
     return StepResult.SR_OKAY
 
 
 def do_command():
     global in_line, line_len, in_col, word, trace_flag, i_count_flag, num, \
-        REGS_SIZE, i_loc, d_loc, d_mem, DADDR_SIZE, reg, step_result_tab, ch
+        REGS_SIZE, i_loc, d_loc, d_mem, DADDR_SIZE, reg, step_result_tab, ch, method_stack
 
     step_cnt = 0  # 需要执行的指令数量\已执行的指令数量
     # i = None
@@ -642,6 +783,18 @@ def do_command():
             d_mem[loc] = 0
         d_mem[0] = DADDR_SIZE - 1
 
+    elif command == 'm':  # 打印函数栈
+        for i in range(method_stack.size()-1, -1, -1):
+            print("###########################################")
+            print("# return point: ", end="")
+            frame = method_stack.values[i]
+            print("%5d" % frame.return_point)
+            print("# args: ", end="")
+            for arg in frame.args.items():
+                print("%5d: %5d | " % (arg[0], arg[1]), end="")
+            print()
+            print("###########################################")
+
     elif command == 'q':  # 退出程序
         return False
 
@@ -680,56 +833,86 @@ if __name__ == '__main__':
 
     source_str = """
 * TINY Compilation to TM Code
-* File: SAMPLE2.tm
+* File: SAMPLE.tm
 * Standard prelude:
-  0:     LD  6,0(0) 	load maxaddress from location 0
-  1:     ST  0,0(0) 	clear location 0
+  0:    LD 6,0(0) 	load maxaddress from location 0
+  1:    ST 0,0(0) 	clear location 0
 * End of standard prelude.
-  2:     IN  0,0,0 	read integer value
-  3:     ST  0,0(5) 	read: store value
-* -> if
+* global: jump to main
+* -> Func
+* -> Compound
+* -> If
 * -> Op
+* -> Var
+  3:    LD 0,1(5) 	var: load id value
+* <- Var
+  4:    ST 0,0(6) 	op: push left
 * -> Const
-  4:    LDC  0,0(0) 	load const
+  5:   LDC 0,0(0) 	const: load const
 * <- Const
-  5:     ST  0,0(6) 	op: push left
-* -> Id
-  6:     LD  0,0(5) 	load id value
-* <- Id
-  7:     LD  1,0(6) 	op: load left
-  8:    SUB  0,1,0 	op <
-  9:    JLT  0,2(7) 	br if true
- 10:    LDC  0,0(0) 	false case
- 11:    LDA  7,1(7) 	unconditional jmp
- 12:    LDC  0,1(0) 	true case
+  6:    LD 1,0(6) 	op: load left
+  7:   SUB 0,1,0 	op ==
+  8:   JEQ 0,2(7) 	br if true
+  9:   LDC 0,0(0) 	false case
+ 10:   LDA 7,1(7) 	unconditional jmp
+ 11:   LDC 0,1(0) 	true case
 * <- Op
 * if: jump to else belongs here
-* -> assign
-* -> Const
- 14:    LDC  0,1(0) 	load const
-* <- Const
- 15:     ST  0,1(5) 	assign: store value
-* <- assign
-* -> Id
- 16:     LD  0,1(5) 	load id value
-* <- Id
- 17:    OUT  0,0,0 	write ac
+* <- Return
+* -> Var
+ 13:    LD 0,0(5) 	var: load id value
+* <- Var
+* <- Return
 * if: jump to end belongs here
- 13:    JEQ  0,5(7) 	if: jmp to else
-* -> assign
-* -> Const
- 19:    LDC  0,0(0) 	load const
-* <- Const
- 20:     ST  0,1(5) 	assign: store value
-* <- assign
-* -> Id
- 21:     LD  0,1(5) 	load id value
-* <- Id
- 22:    OUT  0,0,0 	write ac
- 18:    LDA  7,4(7) 	jmp to end
-* <- if
+ 12:    JEQ  0,2(7) 	if: jmp to else
+* <- Return
+* -> Var
+ 15:    LD 0,1(5) 	var: load id value
+* <- Var
+* <- Return
+ 14:    LDA  7,1(7) 	if: jmp to end
+* <- If
+* <- Compound
+ 16:   LDR 1,0,0 	func: load return point from top frame
+ 17:   POM 0,0,0 	func: pop top frame and restore new activity record
+ 18:   LDA 7,0(1) 	func: jmp back call
+* <- Func
+* -> Func
+* main: program entry point
+* -> Compound
+* -> Assign
+* -> Input
+ 19:    IN 0,0,0 	input: read integer value
+* <- Input
+ 20:    ST 0,2(5) 	assign: store value
+* <- Assign
+* -> Assign
+* -> Input
+ 21:    IN 0,0,0 	input: read integer value
+* <- Input
+ 22:    ST 0,3(5) 	assign: store value
+* <- Assign
+* -> Output
+* -> Call
+ 23:   PSM 0,0,0 	call: push new frame to method stack
+* -> Var
+ 24:    LD 0,2(5) 	var: load id value
+* <- Var
+ 25:   PSA 0,0,0 	call: store new arg to top frame
+* -> Var
+ 26:    LD 0,3(5) 	var: load id value
+* <- Var
+ 27:   PSA 0,1,0 	call: store new arg to top frame
+ 28:   STR 7,1,0 	call: store return point to top frame
+ 29:    LDA  7,-27(7) 	call: jmp to func
+* <- Call
+ 30:   OUT 0,0,0 	output: write ac0
+* <- Output
+* <- Compound
+* <- Func
+  2:    LDA  7,16(7) 	global: jmp to main
 * End of execution.
- 23:   HALT  0,0,0 	
+ 31:  HALT 0,0,0 	
 """
 
     # 测试str.splitlines()

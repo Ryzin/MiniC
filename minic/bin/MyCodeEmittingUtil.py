@@ -22,8 +22,8 @@ class MyRegister(IntEnum):
     """
     AC0 = 0  # 累加器0
     AC1 = 1  # 累加器1
-    GP = 5  # 全程指针, 指向内存数据区底部（用于访问命名变量）
-    MP = 6  # 内存指针, 指向内存数据区顶部（用于访问临时变量）
+    GP = 5  # 全程指针, 指向内存数据区底部（用于访问命名变量，索引从0开始）
+    MP = 6  # 内存指针, 指向内存数据区顶部（用于访问临时变量，索引从DMEM_SIZE-1开始）
     PC = 7  # 程序计数器
 
 
@@ -107,6 +107,24 @@ class MyCodeEmittingUtil:
         """
         print("%3d:  %5s  %d,%d(%d) " % (self.emit_loc, opcode, target_reg,
                                          abs_loc_mem-(self.emit_loc+1), MyRegister.PC), end="")
+        self.emit_loc += 1
+        if self.trace_code:
+            print("\t%s" % comment, end="")
+        print("\n", end="")
+        if self.high_emit_loc < self.emit_loc:
+            self.high_emit_loc = self.emit_loc
+
+    def emit_ms(self, opcode: str, target_reg: int, offset: int, value: int, comment: str):
+        """用于发行一个函数栈指令
+
+        :param opcode: 操作码
+        :param target_reg: 寄存器
+        :param offset: 偏移值
+        :param value: 普通整型值
+        :param comment: 注释字符串
+        :return:
+        """
+        print("%3d: %5s %d,%d,%d " % (self.emit_loc, opcode, target_reg, offset, value), end="")
         self.emit_loc += 1
         if self.trace_code:
             print("\t%s" % comment, end="")

@@ -125,10 +125,10 @@ class MySemanticAnalyzer:
             symbol, scope = st_lookup(node_obj.child[0].name, self.current_scope.id)
             if scope is not self.current_scope:  # 在当前作用域中不存在此声明
                 # 新定义变量，加入到当前作用域符号表中
-                symbol, scope = st_insert(node_obj.child[0].name, self.location, NodeKind.FUNC_K,
+                symbol, scope = st_insert(node_obj.child[0].name, -1, NodeKind.FUNC_K,
                                           node_obj.basic_type, len(node_obj.child[1].child), node_obj.child[0].lineno,
                                           self.current_scope.id, self.current_scope.level)
-                self.location += 1
+                # 函数声明ID并不使用内存位置
 
                 # params
                 params = node_obj.child[1]

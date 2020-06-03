@@ -250,10 +250,9 @@ def MyParser(tree_type="NST"):
                            | SEMI
         """
         if tree_type is "AST":
-            node_kind = NodeKind.EXP_K
             if len(p) is 3:
                 p[0] = p[1]  # expression
-                p[0].node_kind = node_kind
+                p[0].node_kind = p[1].node_kind
             # else:
             #     p[0] = MyTreeNode(p[1])  # SEMI
         else:  # NST

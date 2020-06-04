@@ -31,9 +31,15 @@ class MySemanticAnalyzer:
 
         :return:
         """
-        self.location = 0  # 内存位置计数器
+        self.location = 0  # 内存位置计数器（-1表示不占内存位置）
         self.scope_id = 10000000  # 作用域id计数器
         self.current_scope = update_scope(self.scope_id, 0)  # 当前作用域
+        st_insert("input", -1, NodeKind.FUNC_K,
+                  BasicType.INT, 0, 0,
+                  self.current_scope.id, self.current_scope.level)
+        st_insert("output", -1, NodeKind.FUNC_K,
+                  BasicType.INT, 1, 0,
+                  self.current_scope.id, self.current_scope.level)
 
     def traverse(self, node_obj, pre_proc, post_proc):
         """通用前后序遍历
@@ -163,6 +169,14 @@ class MySemanticAnalyzer:
                     # 符号表中已存在该变量，只追加行号
                     st_insert(symbol.name, 0, symbol.id_kind, symbol.basic_type,
                               1, node_obj.child[0].lineno, scope.id, scope.level)
+
+                    # 对于数组，只有ID的话会被归约为var ~ [ID]，但基本类型应该为数组
+                    for arg in node_obj.child[1].child:  # args
+                        if arg.node_kind is NodeKind.VAR_K:  # var ~ [ID, (expression)]
+                            symbol, scope = st_lookup(arg.child[0].name, self.current_scope.id)
+                            if symbol.basic_type is BasicType.ARRAY and len(arg.child) < 2:
+                                arg.basic_type = symbol.basic_type  # 修改为数组
+                                arg.add_child('*')  # 与单独的数组名作区分，避免在类型检查时报错
                 else:
                     self.error_msg("Semantic error", "Function", node_obj.child[0].name,
                                    node_obj.child[0].lineno, "not a function")
@@ -346,11 +360,11 @@ class MySemanticAnalyzer:
         elif node_obj.node_kind is NodeKind.VAR_K:  # var ~ [ID, (expression)]
             symbol, scope = st_lookup(node_obj.child[0].name, self.current_scope.id)
             if symbol is not None:
-                if symbol.basic_type is BasicType.ARRAY:  # 声明为arr，使用元素为int
+                if symbol.basic_type is BasicType.ARRAY:  # 声明为arr，使用为int
                     if len(node_obj.child) < 2:
                         self.error_msg("Semantic error", "Variable", node_obj.child[0].name,
                                        node_obj.child[0].lineno, "array index missing?")
-                else:
+                else:  # 声明为int，使用为arr
                     if not (symbol.basic_type is node_obj.basic_type):
                         self.error_msg("Type error", "Variable", node_obj.child[0].name,
                                        node_obj.child[0].lineno,
@@ -402,37 +416,53 @@ if __name__ == '__main__':
     # 构建词法分析器
     lexer = MyLexer()
 
-    # 测试用例1
+    # 测试用例
     source_str = """
-        /* A program to perform Euclid's
-           Algorithm to compute gcd. */
-        int a[20];
-        
-        int gcd (int u, int v)
-        {   if (v == 0)return u;
-            if (v == 0)return u;
-            else { 
-            if (v == 0)return u;
-            else return gcd(v, u-u/v*v);}
-            /* u-u/v*v == u mod v */
+/* A program to perform selection sort on a 10
+    element array. */
+int x[10];
+int minloc(int a[], int low, int high)
+{   int i; int x; int k;
+    k = low;
+    x = a[low];
+    i = low + 1;
+    while(i<high)
+    {   if(a[i]< x)
+        {   x =a[i];
+            k=i;
         }
-        
-        int abc (int u, int v)
-        {   
-            if(x){}
-            while(x < 2){
-                return 0;
-            }
-            return 0;
+        i=i+1;
+    }
+    return k;
+}
+
+void sort( int a[], int low, int high)
+{   int i; int k;
+    i=low;
+    while(i<high-1)
+    {   int t;
+        k=minloc(a,i,high);
+        t=a[k];
+        a[k]= a[i];
+        a[i]=t;
+        i=i+1;
+    }
+}
+
+void main(void)
+{   int i;
+    i=0;
+    while(i<10)
+    {   x[i]=input();
+        i=i+1;
+        sort(x,0,10);
+        i=0;
+        while(i<10)
+        {   output(x[i]);
+            i=i+1;
         }
-        
-        void main() {
-            int x; int y;
-            x = a[1];
-            x = input();
-            y = input();
-            output(gcd(x, y));
-        }
+    }
+}
         """
 
     # 词法分析器获得输入
@@ -453,10 +483,10 @@ if __name__ == '__main__':
     root_node = parser.parse(source_str, lexer=lexer)
     # parser.parse() 返回起始规则的p[0]
 
-    # 控制台输出语法分析树
-    # root_node.print()
-
     my_semantic_analyzer = MySemanticAnalyzer()
     my_semantic_analyzer.build_symbol_table(root_node)
     my_semantic_analyzer.type_check(root_node)
     print_scope()
+
+    # 控制台输出语法分析树
+    # root_node.print()

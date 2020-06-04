@@ -11,7 +11,7 @@
 """
 
 from MyCodeEmittingUtil import MyCodeEmittingUtil, MyRegister
-from MyTreeNode import NodeKind
+from MyTreeNode import NodeKind, BasicType
 from MySymbolTable import st_lookup
 
 
@@ -73,7 +73,8 @@ def code_generate(node_obj, scope_id):
         if p1.name != "main":
             # 从函数栈栈顶栈帧中取返回点，更新活动记录，跳转回调用位置（返回点保存至寄存器AC1）
             emit_util.emit_ms("LDR", MyRegister.AC1, 0, 0, "func: load return point from top frame")  # 取返回点指令
-            emit_util.emit_ms("POM", 0, 0, 0, "func: pop top frame and restore new activity record")  # 函数栈退栈指令
+            emit_util.emit_ms("POM", 0, 0, 0, "func: pop top frame")  # 函数栈退栈指令
+            emit_util.emit_ms("REA", 0, 0, 0, "func: restore new activity record")  # 更新活动记录
             emit_util.emit_rm("LDA", MyRegister.PC, 0, MyRegister.AC1, "func: jmp back call")  # 无条件转移指令
 
         if emit_util.trace_code:
@@ -166,7 +167,7 @@ def code_generate(node_obj, scope_id):
         emit_util.emit_rm_abs("LDA", MyRegister.PC, saved_loc1, "while: jmp back to body")  # 无条件转移指令
 
         # 回填转移指令到saved_loc2
-        current_loc = emit_util.emit_skip(0)  # TODO is it 0?
+        current_loc = emit_util.emit_skip(0)
         emit_util.emit_back_fill(saved_loc2)
         emit_util.emit_rm_abs("JEQ", MyRegister.AC0, current_loc, "while: jmp to end")  # 判断转移指令
         emit_util.emit_restore()
@@ -191,17 +192,39 @@ def code_generate(node_obj, scope_id):
         if emit_util.trace_code:
             emit_util.emit_comment("-> Assign")
 
-        p1 = node_obj.child[0]  # ID
+        p1 = node_obj.child[0]  # var ~ [ID, (expression)]
         p2 = node_obj.child[1]  # expression
 
-        # 生成expression代码（计算值保存在寄存器AC0）
+        # 生成expression代码，计算值保存在寄存器AC0
         code_generate(p2, global_scope_id)  # expression
 
         # 保存值
         symbol, scope = st_lookup(p1.child[0].name, scope_id)  # var ~ [ID, (expression)]
         loc = symbol.mem_loc
-        offset = 0 if len(p1.child) == 1 else int(p1.child[1].name)
-        emit_util.emit_rm("ST", MyRegister.AC0, loc + offset, MyRegister.GP, "assign: store value")  # 存值指令
+        if len(p1.child) == 2:  # 数组元素
+            # 先将右值结果压栈
+            emit_util.emit_rm("ST", MyRegister.AC0, tmp_offset, MyRegister.MP, "assign: push right")
+            tmp_offset -= 1
+
+            # 计算数组索引值offset，保存至寄存器AC0
+            code_generate(p1.child[1], global_scope_id)  # expression
+
+            # 计算loc + offset，结果保存至寄存器AC0
+            emit_util.emit_ms("LDL", MyRegister.AC1, loc, 0, "assign: load true location of array")
+            emit_util.emit_ro("ADD", MyRegister.AC0, MyRegister.AC1, MyRegister.AC0, "assign: reg[AC0] + reg[AC1]")
+
+            # 计算(loc + offset) + reg[GP]，结果保存至寄存器AC1（此时获得内存位置）
+            emit_util.emit_ro("ADD", MyRegister.AC1, MyRegister.GP, MyRegister.AC0, "assign: reg[AC0] + reg[GP]")
+
+            # 退栈取右值结果，保存至寄存器AC0
+            tmp_offset += 1
+            emit_util.emit_rm("LD", MyRegister.AC0, tmp_offset, MyRegister.MP, "assign: load right")
+
+            # 保存值（d_mem[(loc + offset) + reg[GP]] = reg[AC0]）
+            emit_util.emit_rm("ST", MyRegister.AC0, 0, MyRegister.AC1, "assign: store value")
+        else:  # 普通变量
+            # 直接将寄存器AC0结果保存至内存位置
+            emit_util.emit_rm("ST", MyRegister.AC0, loc, MyRegister.GP, "assign: store value")  # 存值指令
 
         if emit_util.trace_code:
             emit_util.emit_comment("<- Assign")
@@ -217,16 +240,21 @@ def code_generate(node_obj, scope_id):
         # 查找函数声明
         symbol, scope = st_lookup(p1.name, scope_id)  # var ~ [ID, (expression)]
         loc = symbol.mem_loc  # 此loc保存的是指令位置
-        arg_count = len(p2.child)
 
         # 函数栈压入新栈帧
         emit_util.emit_ms("PSM", 0, 0, 0, "call: push new frame to method stack")
 
         # 生成指示参数计算的指令（准备调用函数）
-        for i in (0, arg_count-1):  # args ~ [expression, expression, ...]
-            code_generate(p2.child[i], global_scope_id)  # expression
+        i = 0
+        for arg in p2.child:  # args ~ [expression, expression, ...]
+            code_generate(arg, global_scope_id)  # expression
             param_symbol = symbol.included_scope.lookup_symbol_by_index(i)
-            emit_util.emit_ms("PSA", MyRegister.AC0, param_symbol.mem_loc, 0, "call: store new arg to top frame")
+            is_refer = 1 if param_symbol.basic_type is BasicType.ARRAY else 0
+            emit_util.emit_ms("PSA", MyRegister.AC0, param_symbol.mem_loc, is_refer, "call: store new arg to top frame")
+            i += 1
+
+        # 实参更新到内存
+        emit_util.emit_ms("REA", 0, 0, 0, "call: restore all arg in top frame to memory")
 
         # 在函数栈栈顶的栈帧中设置返回点（跳过以下跳转指令）
         emit_util.emit_ms("STR", MyRegister.PC, 1, 0, "call: store return point to top frame")  # 存返回点指令
@@ -284,28 +312,27 @@ def code_generate(node_obj, scope_id):
 
         symbol, scope = st_lookup(node_obj.child[0].name, scope_id)
         loc = symbol.mem_loc
-        if len(node_obj.child) is 1:  # 普通变量
-            emit_util.emit_rm("LD", MyRegister.AC0, loc, MyRegister.GP, "var: load id value")  # 取值指令
-        else:  # 数组元素
-            # 生成代码，将loc压栈
-            emit_util.emit_rm("ST", MyRegister.AC0, tmp_offset, MyRegister.MP, "var: push loc")
-            tmp_offset -= 1
+        if node_obj.basic_type is BasicType.INT:
+            if len(node_obj.child) < 2:  # 普通元素 ID
+                emit_util.emit_rm("LD", MyRegister.AC0, loc, MyRegister.GP, "var: load id value")  # 取值指令
+            else:  # 数组元素 ID[expression]
+                # 生成expression的代码，数组索引值offset保存到寄存器AC0
+                code_generate(node_obj.child[1], global_scope_id)  # expression
 
-            # 生成expression的代码，数组索引值保存到寄存器AC0
-            code_generate(node_obj.child[1], global_scope_id)  # expression
+                # 获取数组的内存位置loc，保存至寄存器AC1
+                emit_util.emit_ms("LDL", MyRegister.AC1, loc, 0, "var: load true location of array")
 
-            # 退栈取loc，保存至寄存器AC1
-            tmp_offset += 1
-            emit_util.emit_rm("LD", MyRegister.AC1, tmp_offset, MyRegister.MP, "var: load loc")
+                # 计算loc + offset，保存至寄存器AC0
+                emit_util.emit_ro("ADD", MyRegister.AC0, MyRegister.AC1, MyRegister.AC0, "var: loc + offset")
 
-            # 计算loc + offset，保存至寄存器AC0
-            emit_util.emit_ro("ADD", MyRegister.AC0, MyRegister.AC1, MyRegister.AC0, "var: loc + offset")
+                # 计算reg[AC0] + reg[GP]，保存至寄存器AC0
+                emit_util.emit_ro("ADD", MyRegister.AC0, MyRegister.GP, MyRegister.AC0, "var: reg[AC0] + reg[GP]")
 
-            # 计算reg[AC0] + reg[GP]，保存至寄存器AC0
-            emit_util.emit_ro("ADD", MyRegister.AC0, MyRegister.GP, MyRegister.AC0, "var: reg[AC0] + reg[GP]")
-
-            # 从d_mem[0 + reg[AC0]]中取值（即d_mem[(loc + offset) + reg[GP]]）
-            emit_util.emit_rm("LD", MyRegister.AC0, 0, MyRegister.AC0, "var: load id value")  # 取值指令
+                # 从d_mem[0 + reg[AC0]]中取值（即d_mem[(loc + offset) + reg[GP]]）
+                emit_util.emit_rm("LD", MyRegister.AC0, 0, MyRegister.AC0, "var: load id value")  # 取值指令
+        else:  # BasicType.ARRAY  ID*
+            # 直接将数组地址存至寄存器AC0
+            emit_util.emit_rm("LDC", MyRegister.AC0, loc, 0, "var: load const")  # 直接取值指令
 
         if emit_util.trace_code:
             emit_util.emit_comment("<- Var")
@@ -440,16 +467,53 @@ if __name__ == '__main__':
 
     # 测试用例
     source_str = """
-int gcd (int u, int v)
-{   if (v == 0) return u;
-    else return v;
+/* A program to perform selection sort on a 3
+    element array. */
+int x[4];
+int minloc(int a[], int low, int high)
+{   int i; int x; int k;
+    k = low;
+    x = a[low];
+    i = low + 1;
+    while(i<high)
+    {   if(a[i]< x)
+        {   x =a[i];
+            k=i;
+        }
+        i=i+1;
+    }
+    return k;
 }
 
-void main() {
-    int x; int y;
-    x = input();
-    y = input();
-    output(gcd(x, y));
+void sort( int a[], int low, int high)
+{   int i; int k;
+    i=low;
+    while(i<high-1)
+    {   int t;
+        k=minloc(a,i,high);
+        t=a[k];
+        a[k]= a[i];
+        a[i]=t;
+        i=i+1;
+    }
+}
+
+void main(void)
+{   int i;
+    i=0;
+    while(i<4)
+    {   
+        while(i<4) 
+        {   x[i]=input();
+            i = i + 1;
+        }
+        sort(x,0,4);
+        i=0;
+        while(i<4)
+        {   output(x[i]);
+            i=i+1;
+        }
+    }
 }
 """
 

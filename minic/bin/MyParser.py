@@ -536,6 +536,13 @@ def MyParser(tree_type="NST"):
             if len(p) is 4:
                 p[0].child.extend(p[1].child)  # argList
                 p[0].add_child(p[3])  # expression
+                # if isinstance(p[1], MyTreeNode)
+                # else:  # ID LBRACKET RBRACKET
+                #     node = MyTreeNode('var', node_kind=NodeKind.VAR_K, basic_type=BasicType.ARRAY)
+                #     for i in range(1, 4):
+                #         node.add_child(p[i])  # ID\LBRACKET\RBRACKET，与普通变量作区分
+                #         node.child[i-1].lineno = p.lineno(i)
+                #     p[0].add_child(node)  # var
             else:
                 p[0].add_child(p[1])  # expression
         else:  # NST

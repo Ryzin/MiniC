@@ -30,7 +30,7 @@ class NodeKind(Enum):
     LBRACE_K = 'lbrace'
     RBRACE_K = 'rbrace'
 
-    # param and args kind
+    # params and args kind
     PARAMS_K = 'ParamsK'
     ARGS_K = 'ArgsK'
 

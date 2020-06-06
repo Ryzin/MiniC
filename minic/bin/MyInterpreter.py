@@ -27,10 +27,10 @@ GP_REG = 5  # 全程指针寄存器的在reg中的索引
 OP_CODE_TAB = ["HALT", "IN", "OUT", "ADD", "SUB", "MUL", "DIV", "????",  # RR opcodes
                "LD", "ST", "????",  # RM opcodes
                "LDA", "LDC", "JLT", "JLE", "JGT", "JGE", "JEQ", "JNE", "????",  # RA opcodes
-               "PSM", "POM", "PSA", "REA", "STR", "LDR", "LDL", "????"]  # MS opcodes
+               "PSM", "POM", "PSA", "REA", "STR", "LDR", "LDL", "PS", "PO", "????"]  # MS opcodes
 
 STEP_RESULT_TAB = ["OK", "Halted", "Instruction Memory Fault", "Data Memory Fault",
-                   "Division by 0", "Method Stack Visit Fault"]
+                   "Division by 0", "Method Stack Visit Fault", "Temporary Variable Stack Visit Fault"]
 
 
 # vars
@@ -44,6 +44,7 @@ i_mem = None  # 存放指令对象（Instruction）引用
 d_mem = None  # 存放内存单元对象（Unit）引用
 reg = None  # 存放NO_REGS个寄存器值（Int）
 method_stack = None  # 函数栈
+temp_var_stack = None  # 临时变量栈
 
 in_line = None  # 存放一行字符的字符串
 source_str = None  # 读取的字符流
@@ -108,7 +109,9 @@ class OpCode(IntEnum):
     OP_STR = 24  # method_stack.peek().return_point = reg[r] + d
     OP_LDR = 25  # reg[r] = method_stack.peek().return_point
     OP_LDL = 26  # reg[r] = d_mem[d+reg[GP_REG]].value if d_mem[d+reg[GP_REG]].is_refer else d
-    OP_MSLIM = 27  # MS操作码的范围
+    OP_PS = 27  # push reg[r] to temp_var_stack
+    OP_PO = 28  # reg[r] = temp_var_stack pop value
+    OP_MSLIM = 29  # MS操作码的范围
 
 
 class StepResult(IntEnum):
@@ -122,8 +125,8 @@ class StepResult(IntEnum):
     SR_IMEM_ERR = 2
     SR_DMEM_ERR = 3
     SR_ZERODIVIDE = 4
-    SR_STACKVISIT_ERR = 5
-
+    SR_METHODSTACK_VISIT_ERR = 5
+    SR_TEMPVARSTACK_VISIT_ERR = 6
 
 class Instruction:
     """指令类
@@ -228,7 +231,12 @@ class Stack:
 
 
 def build_interpreter(object_code_str, run_t="script"):
-    """初始化解释器"""
+    """初始化解释器
+
+    :param object_code_str: 目标代码字符串
+    :param run_t: run_type可为'script'和'gui'，即以脚本运行或以GUI运行
+    :return: False为读取错误
+    """
     global i_loc, d_loc, trace_flag, i_count_flag, i_mem, d_mem, reg, method_stack, in_line, \
         source_str, str_list, line_len, in_col, num, word, ch, run_type
 
@@ -437,7 +445,7 @@ def read_instructions():
 
     :return: 当读取某一条指令发现错误时返回False，全部指令正确读取返回True
     """
-    global reg, REGS_SIZE, d_mem, i_mem, method_stack, DADDR_SIZE, IADDR_SIZE, \
+    global reg, REGS_SIZE, d_mem, i_mem, method_stack, temp_var_stack, DADDR_SIZE, IADDR_SIZE, \
         source_str, str_list, line_len, in_line, in_col, num, word, OP_CODE_TAB
 
     lineno = 0  # 当前行号
@@ -458,6 +466,9 @@ def read_instructions():
 
     # 初始化method_stack
     method_stack = Stack()
+
+    # 初始化temp_var_stack
+    temp_var_stack = Stack()
 
     # 初始化str_list，从字符流得到分隔的字符串列表
     str_list = source_str.splitlines(False)  # 按照行('\r', '\r\n', \n')分隔，返回一个包含各行作为元素的列表，且不包含换行符
@@ -555,7 +566,7 @@ def step_tm():
 
     :return: 执行结果类型枚举
     """
-    global PC_REG, GP_REG, reg, IADDR_SIZE, in_line, in_col, i_mem, d_mem, line_len, method_stack
+    global PC_REG, GP_REG, reg, IADDR_SIZE, in_line, in_col, i_mem, d_mem, line_len, method_stack, temp_var_stack
 
     r = None
     s = None
@@ -687,7 +698,7 @@ def step_tm():
 
     elif op is OpCode.OP_PSA:  # 为栈顶栈帧的参数列表增加一个参数
         if method_stack.is_empty():
-            return StepResult.SR_STACKVISIT_ERR
+            return StepResult.SR_METHODSTACK_VISIT_ERR
         frame = method_stack.peek()
         if v:  # 数组
             # 但如果是数组引用，要一直向前搜索到最初的引用位置
@@ -709,25 +720,33 @@ def step_tm():
 
     elif op is OpCode.OP_STR:  # 设置栈顶栈帧的返回点
         if method_stack.is_empty():
-            return StepResult.SR_STACKVISIT_ERR
+            return StepResult.SR_METHODSTACK_VISIT_ERR
         frame = method_stack.peek()
         frame.return_point = reg[r] + d
 
     elif op is OpCode.OP_LDR:  # 获得栈顶栈帧的返回点
         if method_stack.is_empty():
-            return StepResult.SR_STACKVISIT_ERR
+            return StepResult.SR_METHODSTACK_VISIT_ERR
         frame = method_stack.peek()
         reg[r] = frame.return_point
 
     elif op is OpCode.OP_LDL:  # 获得数组符号的真实内存位置
         reg[r] = d_mem[d+reg[GP_REG]].value if d_mem[d+reg[GP_REG]].is_refer else d
 
+    elif op is OpCode.OP_PS:  # 寄存器值压入临时变量栈
+        temp_var_stack.push(reg[r])
+
+    elif op is OpCode.OP_PO:  # 临时变量栈退栈到寄存器
+        if temp_var_stack.is_empty():
+            return StepResult.SR_TEMPVARSTACK_VISIT_ERR
+        reg[r] = temp_var_stack.pop()
+
     return StepResult.SR_OKAY
 
 
 def do_command():
     global in_line, line_len, in_col, word, trace_flag, i_count_flag, num, run_type, \
-        REGS_SIZE, i_loc, d_loc, d_mem, DADDR_SIZE, reg, STEP_RESULT_TAB, ch, method_stack
+        REGS_SIZE, i_loc, d_loc, d_mem, DADDR_SIZE, reg, STEP_RESULT_TAB, ch, method_stack, run_type
 
     step_cnt = 0  # 需要执行的指令数量\已执行的指令数量
     # i = None
@@ -800,33 +819,35 @@ def do_command():
         step_cnt = 1
 
     elif command == 'r':  # 打印寄存器内容
-        register_gap = 1
-        for i in range(0, REGS_SIZE):
-            print(" ———————————— ", " " * register_gap, end="")
-        print()
+        if run_type == "script":
+            register_gap = 1
+            for i in range(0, REGS_SIZE):
+                print(" ———————————— ", " " * register_gap, end="")
+            print()
 
-        for i in range(0, REGS_SIZE):
-            print("|", format(reg[i], "^10"), "|", " " * register_gap, end="")  # 居中对齐
-        print()
+            for i in range(0, REGS_SIZE):
+                print("|", format(reg[i], "^10"), "|", " " * register_gap, end="")  # 居中对齐
+            print()
 
-        for i in range(0, REGS_SIZE):
-            print(" ———————————— ", " " * register_gap, end="")
-        print()
+            for i in range(0, REGS_SIZE):
+                print(" ———————————— ", " " * register_gap, end="")
+            print()
 
-        reg_name = ["ac0", "ac1", "non2", "non3", "non4", "gp5", "mp6", "pc7"]
-        for i in range(0, REGS_SIZE):
-            print(format(reg_name[i], "^14"), " " * register_gap, end="")
-        print()
+            reg_name = ["ac0", "ac1", "non2", "non3", "non4", "gp5", "mp6", "pc7"]
+            for i in range(0, REGS_SIZE):
+                print(format(reg_name[i], "^14"), " " * register_gap, end="")
+            print()
 
-        reg_tag = ["右操作数", "左操作数", "从不使用", "从不使用", "从不使用", "全程指针", "内存指针", "程序计数"]
-        for i in range(0, REGS_SIZE):
-            print(format(reg_tag[i], "^12"), end="")
+            reg_tag = ["右操作数", "左操作数", "从不使用", "从不使用", "从不使用", "全程指针", "内存指针", "程序计数"]
+            for i in range(0, REGS_SIZE):
+                print(format(reg_tag[i], "^12"), end="")
 
-        print()
-        # for i in range(0, REGS_SIZE):
-        #     print("%1d: %4d    " % (i, reg[i]), end="")
-        #     if i % 4 == 3:  # 隔行美观
-        #         print()
+            print()
+        else:
+            for i in range(0, REGS_SIZE):
+                print("%1d: %4d    " % (i, reg[i]), end="")
+                if i % 4 == 3:  # 隔行美观
+                    print()
 
     elif command == 'i':  # 打印自i_loc位置开始的print_cnt个i_mem元素
         print_cnt = 1
@@ -912,12 +933,8 @@ def do_command():
 
 # 测试
 if __name__ == '__main__':
-    # TODO
-    # 检测文件有效性，有误给出输出
-
     source_str = """
-* TINY Compilation to TM Code
-* File: SAMPLE.tm
+* Mini C Compilation to Object Code
 * Standard prelude:
   0:    LD 6,0(0) 	load maxaddress from location 0
   1:    ST 0,0(0) 	clear location 0
@@ -925,420 +942,119 @@ if __name__ == '__main__':
 * global: jump to main
 * -> Func
 * -> Compound
-* -> Assign
-* -> Var
-  3:    LD 0,5(5) 	var: load id value
-* <- Var
-  4:    ST 0,9(5) 	assign: store value
-* <- Assign
-* -> Assign
-* -> Var
-* -> Var
-  5:    LD 0,5(5) 	var: load id value
-* <- Var
-  6:   LDL 1,4,0 	var: load true location of array
-  7:   ADD 0,1,0 	var: loc + offset
-  8:   ADD 0,5,0 	var: reg[AC0] + reg[GP]
-  9:    LD 0,0(0) 	var: load id value
-* <- Var
- 10:    ST 0,8(5) 	assign: store value
-* <- Assign
-* -> Assign
-* -> Op
-* -> Var
- 11:    LD 0,5(5) 	var: load id value
-* <- Var
- 12:    ST 0,0(6) 	op: push left
-* -> Const
- 13:   LDC 0,1(0) 	const: load const
-* <- Const
- 14:    LD 1,0(6) 	op: load left
- 15:   ADD 0,1,0 	op +
-* <- Op
- 16:    ST 0,7(5) 	assign: store value
-* <- Assign
-* -> While
-* while: jump after body comes back here
-* -> Op
-* -> Var
- 17:    LD 0,7(5) 	var: load id value
-* <- Var
- 18:    ST 0,0(6) 	op: push left
-* -> Var
- 19:    LD 0,6(5) 	var: load id value
-* <- Var
- 20:    LD 1,0(6) 	op: load left
- 21:   SUB 0,1,0 	op <
- 22:   JLT 0,2(7) 	br if true
- 23:   LDC 0,0(0) 	false case
- 24:   LDA 7,1(7) 	unconditional jmp
- 25:   LDC 0,1(0) 	true case
-* <- Op
-* while: jump to end belongs here
-* -> Compound
 * -> If
 * -> Op
 * -> Var
-* -> Var
- 27:    LD 0,7(5) 	var: load id value
+  3:    LD 0,0(5) 	var: load id value
 * <- Var
- 28:   LDL 1,4,0 	var: load true location of array
- 29:   ADD 0,1,0 	var: loc + offset
- 30:   ADD 0,5,0 	var: reg[AC0] + reg[GP]
- 31:    LD 0,0(0) 	var: load id value
-* <- Var
- 32:    ST 0,0(6) 	op: push left
-* -> Var
- 33:    LD 0,8(5) 	var: load id value
-* <- Var
- 34:    LD 1,0(6) 	op: load left
- 35:   SUB 0,1,0 	op <
- 36:   JLT 0,2(7) 	br if true
- 37:   LDC 0,0(0) 	false case
- 38:   LDA 7,1(7) 	unconditional jmp
- 39:   LDC 0,1(0) 	true case
+  4:    PS 0,0,0 	op: push left
+* -> Const
+  5:   LDC 0,2(0) 	const: load const
+* <- Const
+  6:    PO 1,0,0 	op: load left
+  7:   SUB 0,1,0 	op <=
+  8:   JLE 0,2(7) 	br if true
+  9:   LDC 0,0(0) 	false case
+ 10:   LDA 7,1(7) 	unconditional jmp
+ 11:   LDC 0,1(0) 	true case
 * <- Op
 * if: jump to else belongs here
-* -> Compound
-* -> Assign
-* -> Var
-* -> Var
- 41:    LD 0,7(5) 	var: load id value
-* <- Var
- 42:   LDL 1,4,0 	var: load true location of array
- 43:   ADD 0,1,0 	var: loc + offset
- 44:   ADD 0,5,0 	var: reg[AC0] + reg[GP]
- 45:    LD 0,0(0) 	var: load id value
-* <- Var
- 46:    ST 0,8(5) 	assign: store value
-* <- Assign
-* -> Assign
-* -> Var
- 47:    LD 0,7(5) 	var: load id value
-* <- Var
- 48:    ST 0,9(5) 	assign: store value
-* <- Assign
-* <- Compound
+* <- Return
+* -> Const
+ 13:   LDC 0,1(0) 	const: load const
+* <- Const
+* <- Return
 * if: jump to end belongs here
- 40:    JEQ  0,9(7) 	if: jmp to else
- 49:    LDA  7,0(7) 	if: jmp to end
-* <- If
-* -> Assign
-* -> Op
-* -> Var
- 50:    LD 0,7(5) 	var: load id value
-* <- Var
- 51:    ST 0,0(6) 	op: push left
-* -> Const
- 52:   LDC 0,1(0) 	const: load const
-* <- Const
- 53:    LD 1,0(6) 	op: load left
- 54:   ADD 0,1,0 	op +
-* <- Op
- 55:    ST 0,7(5) 	assign: store value
-* <- Assign
-* <- Compound
- 56:    LDA  7,-40(7) 	while: jmp back to body
- 26:    JEQ  0,30(7) 	while: jmp to end
-* <- While
+ 12:    JEQ  0,2(7) 	if: jmp to else
 * <- Return
-* -> Var
- 57:    LD 0,9(5) 	var: load id value
-* <- Var
-* <- Return
-* <- Compound
- 58:   LDR 1,0,0 	func: load return point from top frame
- 59:   POM 0,0,0 	func: pop top frame
- 60:   REA 0,0,0 	func: restore new activity record
- 61:   LDA 7,0(1) 	func: jmp back call
-* <- Func
-* -> Func
-* -> Compound
-* -> Assign
-* -> Var
- 62:    LD 0,11(5) 	var: load id value
-* <- Var
- 63:    ST 0,13(5) 	assign: store value
-* <- Assign
-* -> While
-* while: jump after body comes back here
 * -> Op
-* -> Var
- 64:    LD 0,13(5) 	var: load id value
-* <- Var
- 65:    ST 0,0(6) 	op: push left
-* -> Op
-* -> Var
- 66:    LD 0,12(5) 	var: load id value
-* <- Var
- 67:    ST 0,-1(6) 	op: push left
-* -> Const
- 68:   LDC 0,1(0) 	const: load const
-* <- Const
- 69:    LD 1,-1(6) 	op: load left
- 70:   SUB 0,1,0 	op -
-* <- Op
- 71:    LD 1,0(6) 	op: load left
- 72:   SUB 0,1,0 	op <
- 73:   JLT 0,2(7) 	br if true
- 74:   LDC 0,0(0) 	false case
- 75:   LDA 7,1(7) 	unconditional jmp
- 76:   LDC 0,1(0) 	true case
-* <- Op
-* while: jump to end belongs here
-* -> Compound
-* -> Assign
 * -> Call
- 78:   PSM 0,0,0 	call: push new frame to method stack
-* -> Var
- 79:   LDC 0,10(0) 	var: load const
-* <- Var
- 80:   PSA 0,4,1 	call: store new arg to top frame
-* -> Var
- 81:    LD 0,13(5) 	var: load id value
-* <- Var
- 82:   PSA 0,5,0 	call: store new arg to top frame
-* -> Var
- 83:    LD 0,12(5) 	var: load id value
-* <- Var
- 84:   PSA 0,6,0 	call: store new arg to top frame
- 85:   REA 0,0,0 	call: restore all arg in top frame to memory
- 86:   STR 7,1,0 	call: store return point to top frame
- 87:    LDA  7,-85(7) 	call: jmp to func
-* <- Call
- 88:    ST 0,14(5) 	assign: store value
-* <- Assign
-* -> Assign
-* -> Var
-* -> Var
- 89:    LD 0,14(5) 	var: load id value
-* <- Var
- 90:   LDL 1,10,0 	var: load true location of array
- 91:   ADD 0,1,0 	var: loc + offset
- 92:   ADD 0,5,0 	var: reg[AC0] + reg[GP]
- 93:    LD 0,0(0) 	var: load id value
-* <- Var
- 94:    ST 0,15(5) 	assign: store value
-* <- Assign
-* -> Assign
-* -> Var
-* -> Var
- 95:    LD 0,13(5) 	var: load id value
-* <- Var
- 96:   LDL 1,10,0 	var: load true location of array
- 97:   ADD 0,1,0 	var: loc + offset
- 98:   ADD 0,5,0 	var: reg[AC0] + reg[GP]
- 99:    LD 0,0(0) 	var: load id value
-* <- Var
-100:    ST 0,0(6) 	assign: push right
-* -> Var
-101:    LD 0,14(5) 	var: load id value
-* <- Var
-102:   LDL 1,10,0 	assign: load true location of array
-103:   ADD 0,1,0 	assign: reg[AC0] + reg[AC1]
-104:   ADD 1,5,0 	assign: reg[AC0] + reg[GP]
-105:    LD 0,0(6) 	assign: load right
-106:    ST 0,0(1) 	assign: store value
-* <- Assign
-* -> Assign
-* -> Var
-107:    LD 0,15(5) 	var: load id value
-* <- Var
-108:    ST 0,0(6) 	assign: push right
-* -> Var
-109:    LD 0,13(5) 	var: load id value
-* <- Var
-110:   LDL 1,10,0 	assign: load true location of array
-111:   ADD 0,1,0 	assign: reg[AC0] + reg[AC1]
-112:   ADD 1,5,0 	assign: reg[AC0] + reg[GP]
-113:    LD 0,0(6) 	assign: load right
-114:    ST 0,0(1) 	assign: store value
-* <- Assign
-* -> Assign
+ 15:   PSM 0,0,0 	call: push new frame to method stack
 * -> Op
 * -> Var
-115:    LD 0,13(5) 	var: load id value
+ 16:    LD 0,0(5) 	var: load id value
 * <- Var
-116:    ST 0,0(6) 	op: push left
+ 17:    PS 0,0,0 	op: push left
 * -> Const
-117:   LDC 0,1(0) 	const: load const
+ 18:   LDC 0,1(0) 	const: load const
 * <- Const
-118:    LD 1,0(6) 	op: load left
-119:   ADD 0,1,0 	op +
+ 19:    PO 1,0,0 	op: load left
+ 20:   SUB 0,1,0 	op -
 * <- Op
-120:    ST 0,13(5) 	assign: store value
-* <- Assign
+ 21:   PSA 0,0,0 	call: store new arg to top frame
+ 22:   REA 0,0,0 	call: restore all arg in top frame to memory
+ 23:   STR 7,1,0 	call: store return point to top frame
+ 24:    LDA  7,-22(7) 	call: jmp to func
+* <- Call
+ 25:    PS 0,0,0 	op: push left
+* -> Call
+ 26:   PSM 0,0,0 	call: push new frame to method stack
+* -> Op
+* -> Var
+ 27:    LD 0,0(5) 	var: load id value
+* <- Var
+ 28:    PS 0,0,0 	op: push left
+* -> Const
+ 29:   LDC 0,2(0) 	const: load const
+* <- Const
+ 30:    PO 1,0,0 	op: load left
+ 31:   SUB 0,1,0 	op -
+* <- Op
+ 32:   PSA 0,0,0 	call: store new arg to top frame
+ 33:   REA 0,0,0 	call: restore all arg in top frame to memory
+ 34:   STR 7,1,0 	call: store return point to top frame
+ 35:    LDA  7,-33(7) 	call: jmp to func
+* <- Call
+ 36:    PO 1,0,0 	op: load left
+ 37:   ADD 0,1,0 	op +
+* <- Op
+* <- Return
+ 14:    LDA  7,23(7) 	if: jmp to end
+* <- If
 * <- Compound
-121:    LDA  7,-58(7) 	while: jmp back to body
- 77:    JEQ  0,44(7) 	while: jmp to end
-* <- While
-* <- Compound
-122:   LDR 1,0,0 	func: load return point from top frame
-123:   POM 0,0,0 	func: pop top frame
-124:   REA 0,0,0 	func: restore new activity record
-125:   LDA 7,0(1) 	func: jmp back call
+ 38:   LDR 1,0,0 	func: load return point from top frame
+ 39:   POM 0,0,0 	func: pop top frame
+ 40:   REA 0,0,0 	func: restore new activity record
+ 41:   LDA 7,0(1) 	func: jmp back call
 * <- Func
 * -> Func
 * main: program entry point
 * -> Compound
-* -> Assign
-* -> Const
-126:   LDC 0,0(0) 	const: load const
-* <- Const
-127:    ST 0,16(5) 	assign: store value
-* <- Assign
 * -> While
 * while: jump after body comes back here
-* -> Op
-* -> Var
-128:    LD 0,16(5) 	var: load id value
-* <- Var
-129:    ST 0,0(6) 	op: push left
 * -> Const
-130:   LDC 0,4(0) 	const: load const
+ 42:   LDC 0,1(0) 	const: load const
 * <- Const
-131:    LD 1,0(6) 	op: load left
-132:   SUB 0,1,0 	op <
-133:   JLT 0,2(7) 	br if true
-134:   LDC 0,0(0) 	false case
-135:   LDA 7,1(7) 	unconditional jmp
-136:   LDC 0,1(0) 	true case
-* <- Op
-* while: jump to end belongs here
-* -> Compound
-* -> While
-* while: jump after body comes back here
-* -> Op
-* -> Var
-138:    LD 0,16(5) 	var: load id value
-* <- Var
-139:    ST 0,0(6) 	op: push left
-* -> Const
-140:   LDC 0,4(0) 	const: load const
-* <- Const
-141:    LD 1,0(6) 	op: load left
-142:   SUB 0,1,0 	op <
-143:   JLT 0,2(7) 	br if true
-144:   LDC 0,0(0) 	false case
-145:   LDA 7,1(7) 	unconditional jmp
-146:   LDC 0,1(0) 	true case
-* <- Op
 * while: jump to end belongs here
 * -> Compound
 * -> Assign
 * -> Input
-148:    IN 0,0,0 	input: read integer value
+ 44:    IN 0,0,0 	input: read integer value
 * <- Input
-149:    ST 0,0(6) 	assign: push right
-* -> Var
-150:    LD 0,16(5) 	var: load id value
-* <- Var
-151:   LDL 1,0,0 	assign: load true location of array
-152:   ADD 0,1,0 	assign: reg[AC0] + reg[AC1]
-153:   ADD 1,5,0 	assign: reg[AC0] + reg[GP]
-154:    LD 0,0(6) 	assign: load right
-155:    ST 0,0(1) 	assign: store value
+ 45:    ST 0,1(5) 	assign: store value
 * <- Assign
-* -> Assign
-* -> Op
-* -> Var
-156:    LD 0,16(5) 	var: load id value
-* <- Var
-157:    ST 0,0(6) 	op: push left
-* -> Const
-158:   LDC 0,1(0) 	const: load const
-* <- Const
-159:    LD 1,0(6) 	op: load left
-160:   ADD 0,1,0 	op +
-* <- Op
-161:    ST 0,16(5) 	assign: store value
-* <- Assign
-* <- Compound
-162:    LDA  7,-25(7) 	while: jmp back to body
-147:    JEQ  0,15(7) 	while: jmp to end
-* <- While
-* -> Call
-163:   PSM 0,0,0 	call: push new frame to method stack
-* -> Var
-164:   LDC 0,0(0) 	var: load const
-* <- Var
-165:   PSA 0,10,1 	call: store new arg to top frame
-* -> Const
-166:   LDC 0,0(0) 	const: load const
-* <- Const
-167:   PSA 0,11,0 	call: store new arg to top frame
-* -> Const
-168:   LDC 0,4(0) 	const: load const
-* <- Const
-169:   PSA 0,12,0 	call: store new arg to top frame
-170:   REA 0,0,0 	call: restore all arg in top frame to memory
-171:   STR 7,1,0 	call: store return point to top frame
-172:    LDA  7,-111(7) 	call: jmp to func
-* <- Call
-* -> Assign
-* -> Const
-173:   LDC 0,0(0) 	const: load const
-* <- Const
-174:    ST 0,16(5) 	assign: store value
-* <- Assign
-* -> While
-* while: jump after body comes back here
-* -> Op
-* -> Var
-175:    LD 0,16(5) 	var: load id value
-* <- Var
-176:    ST 0,0(6) 	op: push left
-* -> Const
-177:   LDC 0,4(0) 	const: load const
-* <- Const
-178:    LD 1,0(6) 	op: load left
-179:   SUB 0,1,0 	op <
-180:   JLT 0,2(7) 	br if true
-181:   LDC 0,0(0) 	false case
-182:   LDA 7,1(7) 	unconditional jmp
-183:   LDC 0,1(0) 	true case
-* <- Op
-* while: jump to end belongs here
-* -> Compound
 * -> Output
+* -> Call
+ 46:   PSM 0,0,0 	call: push new frame to method stack
 * -> Var
-* -> Var
-185:    LD 0,16(5) 	var: load id value
+ 47:    LD 0,1(5) 	var: load id value
 * <- Var
-186:   LDL 1,0,0 	var: load true location of array
-187:   ADD 0,1,0 	var: loc + offset
-188:   ADD 0,5,0 	var: reg[AC0] + reg[GP]
-189:    LD 0,0(0) 	var: load id value
-* <- Var
-190:   OUT 0,0,0 	output: write ac0
+ 48:   PSA 0,0,0 	call: store new arg to top frame
+ 49:   REA 0,0,0 	call: restore all arg in top frame to memory
+ 50:   STR 7,1,0 	call: store return point to top frame
+ 51:    LDA  7,-49(7) 	call: jmp to func
+* <- Call
+ 52:   OUT 0,0,0 	output: write ac0
 * <- Output
-* -> Assign
-* -> Op
-* -> Var
-191:    LD 0,16(5) 	var: load id value
-* <- Var
-192:    ST 0,0(6) 	op: push left
-* -> Const
-193:   LDC 0,1(0) 	const: load const
-* <- Const
-194:    LD 1,0(6) 	op: load left
-195:   ADD 0,1,0 	op +
-* <- Op
-196:    ST 0,16(5) 	assign: store value
-* <- Assign
 * <- Compound
-197:    LDA  7,-23(7) 	while: jmp back to body
-184:    JEQ  0,13(7) 	while: jmp to end
-* <- While
-* <- Compound
-198:    LDA  7,-71(7) 	while: jmp back to body
-137:    JEQ  0,61(7) 	while: jmp to end
+ 53:    LDA  7,-12(7) 	while: jmp back to body
+ 43:    JEQ  0,10(7) 	while: jmp to end
 * <- While
 * <- Compound
 * <- Func
-  2:    LDA  7,123(7) 	global: jmp to main
+  2:    LDA  7,39(7) 	global: jmp to main
 * End of execution.
-199:  HALT 0,0,0 	
+ 54:  HALT 0,0,0 	
 """
 
     # 测试str.splitlines()

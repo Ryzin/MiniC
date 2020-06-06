@@ -30,6 +30,13 @@ class MyInput(QObject):
 
 
 class MyInputDialog(QWidget):
+    """自定义输入对话框
+
+    获取输入提供给解释执行器
+
+    Attributes:
+        input_text: 输入对话框中输入的字符串
+    """
     input_text = None
 
     def __init__(self, title, desc):

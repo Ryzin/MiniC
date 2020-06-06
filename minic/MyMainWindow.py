@@ -87,6 +87,7 @@ class MyMainWindow(QMainWindow):
         self.__ui.generate_pushButton.clicked.connect(self.generate_push_button_on_clicked)
         self.__ui.clear_code_pushButton.clicked.connect(self.clear_code_action_on_triggered)
         self.__ui.reset_pushButton.clicked.connect(self.reset_all_action_on_triggered)
+        self.__ui.copy_code_instructions_pushButton.clicked.connect(self.copy_code_instructions_on_triggered)
 
         # 单选按钮
         self.__ui.source_code_radioButton.clicked.connect(self.source_code_radio_button_on_checked)
@@ -209,7 +210,7 @@ class MyMainWindow(QMainWindow):
                             print("Object Code has been generated\nBuild successfully")
 
                             # 进行解释执行
-                            print("Interpreter is handling Object Code now")
+                            print("Interpreter is handling Object Code now\n")
                             build_interpreter(object_code, "gui")
                     else:
                         print("Normal Syntax Tree has been generated")
@@ -344,6 +345,11 @@ class MyMainWindow(QMainWindow):
         self.__ui.tabWidget.setCurrentIndex(0)
 
     @pyqtSlot()
+    def copy_code_instructions_on_triggered(self):
+        """复制目标代码结果的槽函数"""
+        QtGui.QGuiApplication.clipboard().setText(self.__ui.code_instructions_textEdit.toPlainText())
+
+    @pyqtSlot()
     def code_edit_text_cursor_position_changed(self):
         """源代码输入框监听光标变化的槽函数"""
         # 根据光标位置更新行号显示信息
@@ -351,7 +357,8 @@ class MyMainWindow(QMainWindow):
         text_layout = cursor.block().layout()  # 为了解决复制代码后，行号不正确的问题
         cursor_relative_pos = cursor.position() - cursor.block().position()  # 当前光标在本block内的相对位置
         row_num = text_layout.lineForTextPosition(cursor_relative_pos).lineNumber() + cursor.block().firstLineNumber()
-        self.__ui.groupBox.setTitle("源代码 - 当前行号：" + str(row_num + 1))
+        title = "源代码" if self.__ui.source_code_radioButton.isChecked() else "目标代码"
+        self.__ui.groupBox.setTitle(title + " - 当前行号：" + str(row_num + 1))
 
     @pyqtSlot()
     def console_edit_text_cursor_position_changed(self):

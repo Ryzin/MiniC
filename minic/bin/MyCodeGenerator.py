@@ -18,10 +18,8 @@ from .MySymbolTable import st_lookup
 # from MyTreeNode import NodeKind, BasicType
 # from MySymbolTable import st_lookup
 
-
 emit_util = None  # 代码发行对象
-# 初始为用作下一个可用临时变量位置对于内存顶部 (由mp寄存器指出）的偏移
-tmp_offset = None  # 临时变量栈的顶部指针，对emit_rm函数的调用与压入和弹出该栈相对应
+# tmp_offset = None  # 临时变量栈的顶部指针（已过时，由于代码生成的弊端，会使在递归调用函数时，该指针并不能正确指示栈顶位置）
 global_scope_id = None  # 作用域id计数器
 
 
@@ -42,7 +40,7 @@ def code_generate(node_obj, scope_id):
     # loc = None  # int，变量地址并以gp寄存器基准的偏移装入或存储值
 
     # print(scope_id)
-    global global_scope_id, tmp_offset
+    global global_scope_id
 
     if node_obj.node_kind is NodeKind.LBRACE_K:
         global_scope_id += 1
@@ -207,8 +205,7 @@ def code_generate(node_obj, scope_id):
         loc = symbol.mem_loc
         if len(p1.child) == 2:  # 数组元素
             # 先将右值结果压栈
-            emit_util.emit_rm("ST", MyRegister.AC0, tmp_offset, MyRegister.MP, "assign: push right")
-            tmp_offset -= 1
+            emit_util.emit_ms("PS", MyRegister.AC0, 0, 0, "assign: push right")
 
             # 计算数组索引值offset，保存至寄存器AC0
             code_generate(p1.child[1], global_scope_id)  # expression
@@ -221,8 +218,7 @@ def code_generate(node_obj, scope_id):
             emit_util.emit_ro("ADD", MyRegister.AC1, MyRegister.GP, MyRegister.AC0, "assign: reg[AC0] + reg[GP]")
 
             # 退栈取右值结果，保存至寄存器AC0
-            tmp_offset += 1
-            emit_util.emit_rm("LD", MyRegister.AC0, tmp_offset, MyRegister.MP, "assign: load right")
+            emit_util.emit_ms("PO", MyRegister.AC0, 0, 0, "assign: load right")
 
             # 保存值（d_mem[(loc + offset) + reg[GP]] = reg[AC0]）
             emit_util.emit_rm("ST", MyRegister.AC0, 0, MyRegister.AC1, "assign: store value")
@@ -355,15 +351,13 @@ def code_generate(node_obj, scope_id):
         code_generate(p1, global_scope_id)
 
         # 生成代码，将左值压栈
-        emit_util.emit_rm("ST", MyRegister.AC0, tmp_offset, MyRegister.MP, "op: push left")
-        tmp_offset -= 1
+        emit_util.emit_ms("PS", MyRegister.AC0, 0, 0, "op: push left")
 
         # 生成右值的代码，值保存到寄存器AC0
         code_generate(p2, global_scope_id)
 
         # 退栈取左值，保存至寄存器AC1
-        tmp_offset += 1
-        emit_util.emit_rm("LD", MyRegister.AC1, tmp_offset, MyRegister.MP, "op: load left")
+        emit_util.emit_ms("PO", MyRegister.AC1, 0, 0, "op: load left")
 
         # 根据二元运算符执行操作，结果保存至寄存器AC0
         operator = node_obj.child[1]
@@ -425,11 +419,10 @@ def build_code_generator(node_obj, trace_code=True):
     :param trace_code: 代码生成跟踪
     :return:
     """
-    global global_scope_id, emit_util, tmp_offset, global_scope_id
+    global global_scope_id, emit_util, global_scope_id
 
     # 初始化
     emit_util = MyCodeEmittingUtil(trace_code)
-    tmp_offset = 0
     global_scope_id = 10000000
 
     # 生成Mini C程序的简单说明
@@ -478,53 +471,21 @@ if __name__ == '__main__':
 
     # 测试用例
     source_str = """
-/* A program to perform selection sort on a 3
-    element array. */
-int x[4];
-int minloc(int a[], int low, int high)
-{   int i; int x; int k;
-    k = low;
-    x = a[low];
-    i = low + 1;
-    while(i<high)
-    {   if(a[i]< x)
-        {   x =a[i];
-            k=i;
-        }
-        i=i+1;
-    }
-    return k;
+// Fibonacci
+int f(int m)
+{
+     if (m <= 2)
+          return 1;
+     else
+          return f(m - 1) + f(m - 2);
 }
 
-void sort( int a[], int low, int high)
-{   int i; int k;
-    i=low;
-    while(i<high-1)
-    {   int t;
-        k=minloc(a,i,high);
-        t=a[k];
-        a[k]= a[i];
-        a[i]=t;
-        i=i+1;
-    }
-}
-
-void main(void)
-{   int i;
-    i=0;
-    while(i<4)
-    {   
-        while(i<4) 
-        {   x[i]=input();
-            i = i + 1;
-        }
-        sort(x,0,4);
-        i=0;
-        while(i<4)
-        {   output(x[i]);
-            i=i+1;
-        }
-    }
+void main() {
+     int x;
+     while (1) {
+         x = input();
+         output(f(x));
+     }
 }
 """
 

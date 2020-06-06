@@ -80,7 +80,7 @@
        </widget>
       </item>
       <item>
-       <layout class="QVBoxLayout" name="verticalLayout_2" stretch="1,1,1,1,1,1,1">
+       <layout class="QVBoxLayout" name="verticalLayout_2" stretch="1,1,1,1,1,0,1,1">
         <property name="spacing">
          <number>10</number>
         </property>
@@ -212,6 +212,13 @@
           </property>
           <property name="text">
            <string>重置全部</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="copy_code_instructions_pushButton">
+          <property name="text">
+           <string>复制目标代码结果</string>
           </property>
          </widget>
         </item>

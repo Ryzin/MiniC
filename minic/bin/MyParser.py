@@ -21,9 +21,12 @@ from .MyTreeNode import MyTreeNode, NodeKind, BasicType
 # from MyTreeNode import MyTreeNode, NodeKind, BasicType
 
 
-# TODO 检查声明是否有保留字
 def MyParser(tree_type="NST"):
-    # tree_type 参数值可为'AST'和'NST'，即抽象语法树和普通语法树
+    """包装语法分析器闭包
+
+    :param tree_type: tree_type可为'AST'和'NST'，即抽象语法树和普通语法树
+    :return: 语法分析器对象
+    """
 
     # 指定优先级（从低到高）和结合性（左/右结合，非关联）
     precedence = (
@@ -589,7 +592,7 @@ if __name__ == '__main__':
     # 构建词法分析器
     lexer = MyLexer()
 
-    # 测试用例1
+    # 测试用例
     # s1 = """int x"""
     source_str = """
     /* A program to perform Euclid's
@@ -606,55 +609,6 @@ if __name__ == '__main__':
         x = input();
         y = input();
         output(gcd(x, y));
-    }
-    """
-
-    # 测试用例2
-    s2 = """
-    /* A program to perform selection sort on a 10
-        element array. */
-    int x[10];
-    int minloc(int a[], int low, int high)
-    {   int i; int x; int k;
-        k = low;
-        x = a[low];
-        i = low + 1;
-        while(i<high)
-        {   if(a[i]< x)
-            {   x =a[i];
-                k=i;
-            }
-            i=i+1;
-        }
-        return k;
-    }
-    
-    void sort( int a[], int low, int high)
-    {   int i; int k;
-        i=low;
-        while(i<high-1)
-        {   int t;
-            k=minloc(a,i,high);
-            t=a[k];
-            a[k]= a[i];
-            a[i]=t;
-            i=i+1;
-        }
-    }
-    
-    void main(void)
-    {   int i;
-        i=0;
-        while(i<10)
-        {   x[i]=input();
-            i=i+1;
-            sort(x,0,10);
-            i=0;
-            while(i<10)
-            {   output(x[i]);
-                i=i+1;
-            }
-        }
     }
     """
 

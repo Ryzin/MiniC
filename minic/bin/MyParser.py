@@ -14,11 +14,11 @@ import logging
 import ply.yacc as yacc
 
 # main.py required
-# from .MyLexer import tokens, MyLexer
-# from .MyTreeNode import MyTreeNode, NodeKind, BasicType
+from .MyLexer import tokens, MyLexer
+from .MyTreeNode import MyTreeNode, NodeKind, BasicType
 
-from MyLexer import tokens, MyLexer
-from MyTreeNode import MyTreeNode, NodeKind, BasicType
+# from MyLexer import tokens, MyLexer
+# from MyTreeNode import MyTreeNode, NodeKind, BasicType
 
 
 # TODO 检查声明是否有保留字

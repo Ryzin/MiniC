@@ -9,21 +9,21 @@
 @Date   : 2020/3/10 22:28
 @Desc   : 重定向控制台输出到控件
 """
-from PyQt5 import QtCore
+from PyQt5.QtCore import QObject, pyqtSignal
 
 
-class MyStream(QtCore.QObject):
+class MyStream(QObject):
     """重定向控制台输出到控件
 
     Attributes:
         new_text: 带一个str类型参数的信号，用于传递字符串
     """
 
-    new_text = QtCore.pyqtSignal(str)
+    new_text = pyqtSignal(str)
 
-    # def __init__(self, new_text):
-    #     super().__init__()
-    #     self.new_text = new_text
+    def __init__(self, slot):
+        super().__init__()
+        self.new_text.connect(slot)
 
     def write(self, text):
         """

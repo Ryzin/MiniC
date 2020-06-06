@@ -9,16 +9,20 @@
 @Date   : 2020/3/19 19:55
 @Desc   : 代码生成器
 """
+# main.py required
+from .MyCodeEmittingUtil import MyCodeEmittingUtil, MyRegister
+from .MyTreeNode import NodeKind, BasicType
+from .MySymbolTable import st_lookup
 
-from MyCodeEmittingUtil import MyCodeEmittingUtil, MyRegister
-from MyTreeNode import NodeKind, BasicType
-from MySymbolTable import st_lookup
+# from MyCodeEmittingUtil import MyCodeEmittingUtil, MyRegister
+# from MyTreeNode import NodeKind, BasicType
+# from MySymbolTable import st_lookup
 
 
-emit_util = MyCodeEmittingUtil(True)
+emit_util = None  # 代码发行对象
 # 初始为用作下一个可用临时变量位置对于内存顶部 (由mp寄存器指出）的偏移
-tmp_offset = 0  # 临时变量栈的顶部指针，对emit_rm函数的调用与压入和弹出该栈相对应
-global_scope_id = 10000000  # 作用域id计数器
+tmp_offset = None  # 临时变量栈的顶部指针，对emit_rm函数的调用与压入和弹出该栈相对应
+global_scope_id = None  # 作用域id计数器
 
 
 def code_generate(node_obj, scope_id):
@@ -414,17 +418,22 @@ def code_generate(node_obj, scope_id):
             emit_util.emit_comment("<- Op")
 
 
-def init(node_obj):
+def build_code_generator(node_obj, trace_code=True):
     """代码生成初始化
 
     :param node_obj: 语法树节点
+    :param trace_code: 代码生成跟踪
     :return:
     """
-    global global_scope_id
+    global global_scope_id, emit_util, tmp_offset, global_scope_id
 
-    # 生成TINY程序的简单说明
-    emit_util.emit_comment("TINY Compilation to TM Code")
-    emit_util.emit_comment("File: SAMPLE.tm")  # TODO
+    # 初始化
+    emit_util = MyCodeEmittingUtil(trace_code)
+    tmp_offset = 0
+    global_scope_id = 10000000
+
+    # 生成Mini C程序的简单说明
+    emit_util.emit_comment("Mini C Compilation to Object Code")
 
     # 生成标准序言，设置启动时的运行时环境
     emit_util.emit_comment("Standard prelude:")
@@ -453,6 +462,8 @@ def init(node_obj):
     # 终止程序
     emit_util.emit_comment("End of execution.")
     emit_util.emit_ro("HALT", 0, 0, 0, "")  # HALT：停止执行(忽略操作数)
+
+    return emit_util.result
 
 
 # 测试
@@ -540,7 +551,8 @@ void main(void)
     # root_node.print()
 
     # 代码生成初始化
-    init(root_node)
+    build_code_generator(root_node)
+    print(emit_util.result)
 
     # 打印作用域和符号表信息
     # print_scope()

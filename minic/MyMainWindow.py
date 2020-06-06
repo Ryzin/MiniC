@@ -17,10 +17,14 @@ from PyQt5.QtGui import QTextCursor, QColor, QBrush
 from PyQt5.QtWidgets import QMainWindow, QFileDialog, QApplication, QTreeWidgetItem, QHeaderView, QAbstractItemView, \
     QTableWidgetItem, QMessageBox
 from PyQt5 import QtGui
-from PyQt5.QtCore import pyqtSlot
+from PyQt5.QtCore import pyqtSlot, Qt, QEvent
 
+from bin.MyCodeGenerator import build_code_generator
+from bin.MyInput import MyInput
+from bin.MyInterpreter import build_interpreter
 from bin.MyLexer import tokens, MyLexer
 from bin.MyParser import MyParser
+from bin.MySemanticAnalyzer import MySemanticAnalyzer
 from bin.MyStream import MyStream
 import mainwindow
 
@@ -37,6 +41,7 @@ class MyMainWindow(QMainWindow):
 
     __ui = mainwindow.Ui_MainWindow()
     __file_path = None
+    my_input = None
 
     def __init__(self):
         """类的构造函数"""
@@ -45,7 +50,10 @@ class MyMainWindow(QMainWindow):
         self.__bindUi__()
 
         # 自定义输出流
-        sys.stdout = MyStream(new_text=self.on_update_text)
+        sys.stdout = MyStream(slot=self.on_update_text)
+
+        # 控制台输入监听
+        self.my_input = MyInput(slot=self.on_input_text)
 
     def __initUi__(self):
         """初始化界面"""
@@ -98,6 +106,9 @@ class MyMainWindow(QMainWindow):
         # 源代码输入框
         self.__ui.code_textEdit.cursorPositionChanged.connect(self.code_edit_text_cursor_position_changed)
 
+        # 控制台输入框
+        self.__ui.console_textEdit.cursorPositionChanged.connect(self.console_edit_text_cursor_position_changed)
+
         # """方法setToolTip在用户将鼠标停留在按钮上时显示的消息"""
         # button.setToolTip("This is an example button")
 
@@ -115,10 +126,19 @@ class MyMainWindow(QMainWindow):
         self.__ui.console_textEdit.setTextCursor(cursor)
         self.__ui.console_textEdit.ensureCursorVisible()
 
+    def on_input_text(self, text):
+        """控制台获得输入
+
+        :param text: 字符串
+        :return:
+        """
+        # print("\n", text)
+        # 放弃，改用QInputDialog
+        pass
+
     @pyqtSlot()
     def generate_push_button_on_clicked(self):
-        """用tny源代码生成词法分析、语法分析结果的槽函数"""
-        # TODO
+        """用tny源代码或tm目标代码生成结果的槽函数"""
         # print("生成")
         self.__ui.tabWidget.setCurrentIndex(0)  # 跳到第一个tab
         self.__ui.console_textEdit.clear()
@@ -127,31 +147,19 @@ class MyMainWindow(QMainWindow):
         self.__ui.parser_treeWidget.clear()
         self.__ui.code_instructions_textEdit.clear()
 
+        # 从输入框获得字符串
+        s = self.__ui.code_textEdit.toPlainText()
+
+        # 根据选择的输入类型进行操作
+        if self.__ui.code_instructions_radioButton.isChecked():
+            # 进行解释执行
+            print("Interpreter is handling Object Code now")
+            build_interpreter(s, "gui")
+            return
+
         # 词法分析
         # 构建词法分析器
         lexer = MyLexer()
-
-        # # 测试用例1
-        # s = """
-        # /* A program to perform Euclid's
-        #    Algorithm to compute gcd. */
-        #
-        # int gcd (int u, int v)
-        # {   if (v == 0)return u;
-        #     else return gcd(v, u-u/v*v);
-        #     /* u-u/v*v == u mod v */
-        # }
-        #
-        # void main() {
-        #     int x; int y;
-        #     x = input();
-        #     y = input();
-        #     output(gcd(x, y));
-        # }
-        # """
-
-        # 从输入框获得字符串
-        s = self.__ui.code_textEdit.toPlainText()
 
         # 词法分析器获得输入
         lexer.input(s)
@@ -183,7 +191,29 @@ class MyMainWindow(QMainWindow):
                 # 更新语法分析QTreeWidget组件
                 if root_node is not None:
                     self.update_parser_tree_widget(root_node)
-                    print("Syntax Tree has been generated\nBuild successfully")
+
+                    if tree_type != "NST":
+                        print("Abstract Syntax Tree has been generated")
+
+                        # 进行语义分析
+                        my_semantic_analyzer = MySemanticAnalyzer()
+                        my_semantic_analyzer.build_semantic_analyzer(root_node)
+                        if my_semantic_analyzer.error:
+                            print("Semantic Analyzer found errors")
+                        else:
+                            print("Symbol Table has been built and Type Check has executed")
+
+                            # 进行目标代码生成
+                            object_code = build_code_generator(root_node)
+                            self.update_code_generate_text_edit(object_code)
+                            print("Object Code has been generated\nBuild successfully")
+
+                            # 进行解释执行
+                            print("Interpreter is handling Object Code now")
+                            build_interpreter(object_code, "gui")
+                    else:
+                        print("Normal Syntax Tree has been generated")
+                        print("If 'NST' is selected, program will not run Semantic Analyzer and Code Generator")
             else:
                 print("Syntax Tree building failed")
         else:
@@ -192,16 +222,14 @@ class MyMainWindow(QMainWindow):
     @pyqtSlot()
     def source_code_radio_button_on_checked(self):
         """选择源代码输入的槽函数"""
-        # TODO
         # print("输入：源代码")
         self.__ui.groupBox.setTitle("源代码")
 
     @pyqtSlot()
     def code_instructions_radio_button_on_checked(self):
         """选择代码指令输入的槽函数"""
-        # TODO
         # print("输入：代码指令")
-        self.__ui.groupBox.setTitle("代码指令")
+        self.__ui.groupBox.setTitle("目标代码")
 
     @pyqtSlot()
     def ast_radio_button_on_checked(self):
@@ -218,11 +246,11 @@ class MyMainWindow(QMainWindow):
     @pyqtSlot()
     def create_file_action_on_triggered(self):
         """新建文件的槽函数"""
-        self.__file_path, file_type = QFileDialog.getSaveFileName(self,
-                                                                "新建文件",
-                                                                "../",   # 指定路径（此处为上一级）
-                                                                "TNY Files (*.tny);;All Files (*)")
-                                                                # 设置文件扩展名过滤,注意用双分号间隔
+        self.__file_path, file_type = QFileDialog.getSaveFileName(self,  # 设置文件扩展名过滤,注意用双分号间隔
+                                                                  "新建文件",
+                                                                  "../",   # 指定路径（此处为上一级）
+                                                                  "TNY Files (*.tny);;TM Files (*.tm);;All Files (*)")
+
         if self.__file_path:
             file = open(self.__file_path, "w", encoding='UTF-8')  # 以写入的方式打开文件
             with file:
@@ -235,9 +263,9 @@ class MyMainWindow(QMainWindow):
     def open_file_action_on_triggered(self):
         """打开文件的槽函数"""
         self.__file_path, file_type = QFileDialog.getOpenFileName(self,
-                                                               "打开文件",
-                                                               "../",
-                                                               "TNY Files (*.tny);;All Files (*)")
+                                                                  "打开文件",
+                                                                  "../",
+                                                                  "TNY Files (*.tny);;TM Files (*.tm);;All Files (*)")
         if self.__file_path:
             print("打开文件\n" + self.__file_path)
             # file = QFile(file_path)  # 创建文件对象，不创建文件对象也不报错 也可以读文件和写文件
@@ -254,7 +282,8 @@ class MyMainWindow(QMainWindow):
             self.__file_path, file_type = QFileDialog.getSaveFileName(self,
                                                                       "保存为",
                                                                       "../",
-                                                                      "TNY Files (*.tny);;All Files (*)")
+                                                                      "TNY Files (*.tny);;TM Files (*.tm)"
+                                                                      ";;All Files (*)")
         if self.__file_path:  # 再判断一遍，防止取消打开文件
             file = open(self.__file_path, "w", encoding='UTF-8')  # 以写入的方式打开文件
             with file:
@@ -270,9 +299,9 @@ class MyMainWindow(QMainWindow):
     def save_as_file_action_on_triggered(self):
         """保存为的槽函数"""
         self.__file_path, file_type = QFileDialog.getSaveFileName(self,
-                                                    "保存为",
-                                                    "../",
-                                                    "TNY Files (*.tny);;All Files (*)")
+                                                                  "保存为",
+                                                                  "../",
+                                                                  "TNY Files (*.tny);;TM Files (*.tm);;All Files (*)")
 
         if self.__file_path:
             file = open(self.__file_path, "w", encoding='UTF-8')  # 以写入的方式打开文件
@@ -304,7 +333,6 @@ class MyMainWindow(QMainWindow):
     @pyqtSlot()
     def reset_all_action_on_triggered(self):
         """重置全部的槽函数"""
-        # TODO
         # print("重置全部")
         self.__ui.code_textEdit.clear()
         self.__ui.console_textEdit.clear()
@@ -322,9 +350,82 @@ class MyMainWindow(QMainWindow):
         cursor = self.__ui.code_textEdit.textCursor()  # 当前光标
         text_layout = cursor.block().layout()  # 为了解决复制代码后，行号不正确的问题
         cursor_relative_pos = cursor.position() - cursor.block().position()  # 当前光标在本block内的相对位置
-        # col_num = cursor.columnNumber()
         row_num = text_layout.lineForTextPosition(cursor_relative_pos).lineNumber() + cursor.block().firstLineNumber()
         self.__ui.groupBox.setTitle("源代码 - 当前行号：" + str(row_num + 1))
+
+    @pyqtSlot()
+    def console_edit_text_cursor_position_changed(self):
+        """控制台输入框监听光标变化的槽函数"""
+        # 仅允许最后一行可以编辑，用于用户输入
+        cursor = self.__ui.console_textEdit.textCursor()  # 当前光标
+        text_layout = cursor.block().layout()
+        cursor_relative_pos = cursor.position() - cursor.block().position()  # 当前光标在本block内的相对位置
+        row_num = text_layout.lineForTextPosition(cursor_relative_pos).lineNumber() + cursor.block().firstLineNumber()
+        last_line_number = self.__ui.console_textEdit.document().lineCount()
+        if row_num >= last_line_number - 1:  # 行号为最后时允许可写
+            self.__ui.console_textEdit.setReadOnly(False)
+        else:
+            self.__ui.console_textEdit.setReadOnly(True)
+
+    def eventFilter(self, source, event):
+        """事件筛选器
+
+        主要是为了从主窗口进行事件筛选，决定是否分发给子控件
+
+        """
+        if event.type() == QEvent.KeyPress:
+            if source is self.__ui.console_textEdit:  # 对控制台的输入事件进行处理
+                if event.key() == Qt.Key_Backspace:
+                    if not self.cursor_is_on_console_input_line():
+                        return True  # True为父控件拦截子控件事件
+                    if self.console_input_line_is_empty():
+                        return True
+                    return False
+                elif event.key() == Qt.Key_Return:
+                    # if not self.cursor_is_on_console_input_line():
+                    #     return False
+                    line = self.get_console_input_line()
+                    if line == "":  # 未输入不允许换行
+                        return True
+                    self.my_input.new_text.emit(line)  # 发送信号
+                    return True
+        return super(MyMainWindow, self).eventFilter(source, event)
+
+    def console_input_line_is_empty(self):
+        """判断控制台输入框的输入行是否为空
+
+        :return: True为空，False为非空
+        """
+        cursor = self.__ui.console_textEdit.textCursor()  # 当前光标
+        cursor.movePosition(QTextCursor.End)
+        col_num = cursor.columnNumber()  # 光标所处列号
+        pre_text_size = 0  # 预留的输入行前缀长度（如>>或者input:）
+        return col_num == pre_text_size
+
+    def cursor_is_on_console_input_line(self):
+        """判断游标是否在控制台输入框的输入行
+
+        :return: True为在，False为不在
+        """
+        cursor_block = self.__ui.console_textEdit.textCursor().blockNumber()
+        bottom_cursor = self.__ui.console_textEdit.textCursor()
+        bottom_cursor.movePosition(QTextCursor.End)
+        bottom_block = bottom_cursor.blockNumber()
+        return cursor_block == bottom_block
+
+    def get_console_input_line(self):
+        """获取控制台输入框的输入行
+
+        :return: 字符串
+        """
+        cursor = self.__ui.console_textEdit.textCursor()
+        cursor.movePosition(QTextCursor.StartOfLine)
+        pre_text_size = 0  # 预留的输入行前缀长度（如>>，则为2）
+        cursor.movePosition(QTextCursor.Right, QTextCursor.MoveAnchor, pre_text_size)
+        cursor.movePosition(QTextCursor.EndOfLine, QTextCursor.KeepAnchor)
+        line = cursor.selectedText()
+        cursor.clearSelection()
+        return line
 
     def update_lexer_table_widget(self, lexer):
         """更新词法分析QTableWidget组件
@@ -391,9 +492,22 @@ class MyMainWindow(QMainWindow):
 
         return tree_widget_item
 
+    def update_code_generate_text_edit(self, text):
+        """更新代码生成QTextEdit组件
+
+        添加文本
+
+        :param text: 字符串
+        :return:
+        """
+        text_edit = self.__ui.code_instructions_textEdit
+        text_edit.clear()
+        text_edit.setText(text)
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     mw = MyMainWindow()
     mw.show()
+    app.installEventFilter(mw)  # 在主程序中给主窗口对象安装事件筛选
     sys.exit(app.exec_())

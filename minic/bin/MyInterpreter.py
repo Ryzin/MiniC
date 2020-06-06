@@ -9,9 +9,13 @@
 @Date   : 2020/5/12 15:06
 @Desc   : 解释执行器
 """
-
+import sys
 from enum import Enum, IntEnum
 from collections import OrderedDict
+
+from PyQt5.QtWidgets import QApplication
+
+from bin.MyInput import MyInputDialog
 
 
 # const
@@ -20,6 +24,36 @@ DADDR_SIZE = 1024  # 内存数据区大小
 REGS_SIZE = 8  # 寄存器个数
 PC_REG = 7  # 程序计数器寄存器的在reg中的索引
 GP_REG = 5  # 全程指针寄存器的在reg中的索引
+OP_CODE_TAB = ["HALT", "IN", "OUT", "ADD", "SUB", "MUL", "DIV", "????",  # RR opcodes
+               "LD", "ST", "????",  # RM opcodes
+               "LDA", "LDC", "JLT", "JLE", "JGT", "JGE", "JEQ", "JNE", "????",  # RA opcodes
+               "PSM", "POM", "PSA", "REA", "STR", "LDR", "LDL", "????"]  # MS opcodes
+
+STEP_RESULT_TAB = ["OK", "Halted", "Instruction Memory Fault", "Data Memory Fault",
+                   "Division by 0", "Method Stack Visit Fault"]
+
+
+# vars
+run_type = "script"  # 解释执行器启动方式（script或gui）
+i_loc = 0  # 当前指令存储区访问索引
+d_loc = 0  # 当前内存数据区访问索引
+trace_flag = False  # 指令内容跟踪
+i_count_flag = False  # 指令条数跟踪
+
+i_mem = None  # 存放指令对象（Instruction）引用
+d_mem = None  # 存放内存单元对象（Unit）引用
+reg = None  # 存放NO_REGS个寄存器值（Int）
+method_stack = None  # 函数栈
+
+in_line = None  # 存放一行字符的字符串
+source_str = None  # 读取的字符流
+str_list = None  # 字符串列表
+line_len = None  # 当前读取行的长度
+in_col = None  # 当前读取到的列号
+
+num = None  # 存放一个整型数
+word = ""  # 存放一个单词的字符串
+ch = None  # 存放一个字符的字符串
 
 
 class OpClass(Enum):
@@ -193,35 +227,40 @@ class Stack:
         return self.values[self.size() - 1]
 
 
-# vars
-i_loc = 0  # 当前指令存储区访问索引
-d_loc = 0  # 当前内存数据区访问索引
-trace_flag = False  # 指令内容跟踪
-i_count_flag = False  # 指令条数跟踪
+def build_interpreter(object_code_str, run_t="script"):
+    """初始化解释器"""
+    global i_loc, d_loc, trace_flag, i_count_flag, i_mem, d_mem, reg, method_stack, in_line, \
+        source_str, str_list, line_len, in_col, num, word, ch, run_type
 
-i_mem = None  # 存放指令对象（Instruction）引用
-d_mem = None  # 存放内存单元对象（Unit）引用
-reg = None  # 存放NO_REGS个寄存器值（Int）
-method_stack = None  # 函数栈
+    run_type = run_t  # 解释执行器启动方式（script或gui）
+    i_loc = 0  # 当前指令存储区访问索引
+    d_loc = 0  # 当前内存数据区访问索引
+    trace_flag = False  # 指令内容跟踪
+    i_count_flag = False  # 指令条数跟踪
 
-op_code_tab = ["HALT", "IN", "OUT", "ADD", "SUB", "MUL", "DIV", "????",  # RR opcodes
-               "LD", "ST", "????",  # RM opcodes
-               "LDA", "LDC", "JLT", "JLE", "JGT", "JGE", "JEQ", "JNE", "????",  # RA opcodes
-               "PSM", "POM", "PSA", "REA", "STR", "LDR", "LDL", "????"]  # MS opcodes
+    i_mem = None  # 存放指令对象（Instruction）引用
+    d_mem = None  # 存放内存单元对象（Unit）引用
+    reg = None  # 存放NO_REGS个寄存器值（Int）
+    method_stack = None  # 函数栈
 
-step_result_tab = ["OK", "Halted", "Instruction Memory Fault", "Data Memory Fault",
-                   "Division by 0", "Method Stack Visit Fault"]
+    in_line = None  # 存放一行字符的字符串
+    source_str = object_code_str  # 读取的字符流
+    str_list = None  # 字符串列表
+    line_len = None  # 当前读取行的长度
+    in_col = None  # 当前读取到的列号
 
+    num = None  # 存放一个整型数
+    word = ""  # 存放一个单词的字符串
+    ch = None  # 存放一个字符的字符串
 
-in_line = None  # 存放一行字符的字符串
-source_str = None  # 读取的字符流
-str_list = None  # 字符串列表
-line_len = None  # 当前读取行的长度
-in_col = None  # 当前读取到的列号
-
-num = None  # 存放一个整型数
-word = ""  # 存放一个单词的字符串
-ch = None  # 存放一个字符的字符串
+    if not read_instructions():
+        print("Object Code reading error")
+        return False
+    while True:
+        done = not do_command()  # 测试do_command()：t\h\p\s\g\r\i\d\m\c\q
+        if done:
+            break
+    return True
 
 
 def get_op_class(c):
@@ -250,11 +289,11 @@ def write_instruction(loc):
     :param loc: i_mem的索引
     :return:
     """
-    global op_code_tab, i_mem, IADDR_SIZE
+    global OP_CODE_TAB, i_mem, IADDR_SIZE
 
     print("%5d: " % loc, end="")
     if 0 <= loc < IADDR_SIZE:
-        print("%6s%3d," % (op_code_tab[i_mem[loc].op], i_mem[loc].arg1), end="")
+        print("%6s%3d," % (OP_CODE_TAB[i_mem[loc].op], i_mem[loc].arg1), end="")
         op_class = get_op_class(i_mem[loc].op)
         if op_class is OpClass.OPC_IRR or OpClass.OPC_IMS:
             print("%1d,%1d" % (i_mem[loc].arg2, i_mem[loc].arg3), end="")
@@ -399,7 +438,7 @@ def read_instructions():
     :return: 当读取某一条指令发现错误时返回False，全部指令正确读取返回True
     """
     global reg, REGS_SIZE, d_mem, i_mem, method_stack, DADDR_SIZE, IADDR_SIZE, \
-        source_str, str_list, line_len, in_line, in_col, num, word, op_code_tab
+        source_str, str_list, line_len, in_line, in_col, num, word, OP_CODE_TAB
 
     lineno = 0  # 当前行号
 
@@ -445,9 +484,9 @@ def read_instructions():
             # 根据前4个有效字符获得操作码枚举
             op = OpCode.OP_HALT  # OpCode.OP_HALT为0（最小），OpCode.OP_RALIM为19（最大）
             tmp_word = word[:4]  # 取左4位
-            while op < OpCode.OP_MSLIM and op_code_tab[op][:4] != tmp_word:
+            while op < OpCode.OP_MSLIM and OP_CODE_TAB[op][:4] != tmp_word:
                 op = OpCode(op + 1)
-            if op_code_tab[op][:4] != tmp_word:  # 确保不是因为遍历完OpCode而退出的循环
+            if OP_CODE_TAB[op][:4] != tmp_word:  # 确保不是因为遍历完OpCode而退出的循环
                 return error("Illegal opcode", lineno, loc)
 
             # 根据指令类型进行不同的指令正确性校验
@@ -567,8 +606,12 @@ def step_tm():
 
     elif op is OpCode.OP_IN:  # 读取一个整型数
         while True:
-            print("Enter value for IN instruction: ", end="")
-            in_line = input()
+            if run_type == "gui":
+                input_dialog = MyInputDialog("请输入", "Enter value for IN instruction: ")
+                print("Enter value for IN instruction: ", input_dialog.input_text)
+                in_line = input_dialog.input_text
+            else:
+                in_line = input("Enter value for IN instruction:")
             line_len = len(in_line)
             in_col = 0
             ok = get_num()
@@ -683,8 +726,8 @@ def step_tm():
 
 
 def do_command():
-    global in_line, line_len, in_col, word, trace_flag, i_count_flag, num, \
-        REGS_SIZE, i_loc, d_loc, d_mem, DADDR_SIZE, reg, step_result_tab, ch, method_stack
+    global in_line, line_len, in_col, word, trace_flag, i_count_flag, num, run_type, \
+        REGS_SIZE, i_loc, d_loc, d_mem, DADDR_SIZE, reg, STEP_RESULT_TAB, ch, method_stack
 
     step_cnt = 0  # 需要执行的指令数量\已执行的指令数量
     # i = None
@@ -693,7 +736,12 @@ def do_command():
     # reg_no = None
     # loc = None
 
-    in_line = input("command: ")
+    if run_type == "gui":
+        input_dialog = MyInputDialog("请输入", "command: ")
+        print("command: ", input_dialog.input_text)
+        in_line = input_dialog.input_text
+    else:
+        in_line = input("command:")
     line_len = len(in_line)
     in_col = 0
     get_word()
@@ -855,9 +903,9 @@ def do_command():
                     write_instruction(i_loc)
                 step_result = step_tm()
                 step_cnt = step_cnt - 1
-            do_command()
+            # do_command()
 
-        print("%s" % step_result_tab[step_result])
+        print("%s" % STEP_RESULT_TAB[step_result])
 
     return True
 
@@ -1340,12 +1388,15 @@ if __name__ == '__main__':
     # print(word)
 
     # 测试write_instruction()和step_tm()
-    import sys
-    if not read_instructions():
-        sys.exit(0)
-    while True:
-        done = not do_command()  # 测试do_command()：t\h\p\s\g\r\i\d\m\c\q
-        if done:
-            break
+    # import sys
+    # if not read_instructions():
+    #     sys.exit(0)
+    # while True:
+    #     done = not do_command()  # 测试do_command()：t\h\p\s\g\r\i\d\m\c\q
+    #     if done:
+    #         break
 
+    app = QApplication(sys.argv)
+    build_interpreter(source_str, "script")
     print("Simulation done.")
+    sys.exit(app.exec_())

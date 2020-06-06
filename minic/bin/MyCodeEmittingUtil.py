@@ -31,6 +31,7 @@ class MyCodeEmittingUtil:
     trace_code = False
     emit_loc = 0  # 当前指令位置（指示发行代码的指令号）
     high_emit_loc = 0  # 当前最高指令位置（结合emit_skip, emit_back_fill, 和emit_restore使用）
+    result = ""  # 存放代码发行结果
 
     def __init__(self, trace_code):
         self.trace_code = trace_code
@@ -44,7 +45,7 @@ class MyCodeEmittingUtil:
         :return:
         """
         if self.trace_code:
-            print("* %s\n" % s, end="")
+            self.result += ("* %s\n" % s)
 
     def emit_ro(self, opcode: str, target_reg: int, first_src_reg: int, second_src_reg: int, comment: str):
         """发行一个寄存器指令
@@ -58,11 +59,11 @@ class MyCodeEmittingUtil:
         :param comment: 注释字符串
         :return:
         """
-        print("%3d: %5s %d,%d,%d " % (self.emit_loc, opcode, target_reg, first_src_reg, second_src_reg), end="")
+        self.result += ("%3d: %5s %d,%d,%d " % (self.emit_loc, opcode, target_reg, first_src_reg, second_src_reg))
         self.emit_loc += 1
         if self.trace_code:
-            print("\t%s" % comment, end="")
-        print("\n", end="")
+            self.result += ("\t%s" % comment)
+        self.result += "\n"
         if self.high_emit_loc < self.emit_loc:
             self.high_emit_loc = self.emit_loc
 
@@ -78,11 +79,11 @@ class MyCodeEmittingUtil:
         :param comment: 注释字符串
         :return:
         """
-        print("%3d: %5s %d,%d(%d) " % (self.emit_loc, opcode, target_reg, offset, base_reg), end="")
+        self.result += ("%3d: %5s %d,%d(%d) " % (self.emit_loc, opcode, target_reg, offset, base_reg))
         self.emit_loc += 1
         if self.trace_code:
-            print("\t%s" % comment, end="")
-        print("\n", end="")
+            self.result += ("\t%s" % comment)
+        self.result += "\n"
         if self.high_emit_loc < self.emit_loc:
             self.high_emit_loc = self.emit_loc
 
@@ -105,12 +106,12 @@ class MyCodeEmittingUtil:
         :param comment: 注释字符串
         :return:
         """
-        print("%3d:  %5s  %d,%d(%d) " % (self.emit_loc, opcode, target_reg,
-                                         abs_loc_mem-(self.emit_loc+1), MyRegister.PC), end="")
+        self.result += ("%3d:  %5s  %d,%d(%d) " % (self.emit_loc, opcode, target_reg,
+                                                   abs_loc_mem-(self.emit_loc+1), MyRegister.PC))
         self.emit_loc += 1
         if self.trace_code:
-            print("\t%s" % comment, end="")
-        print("\n", end="")
+            self.result += ("\t%s" % comment)
+        self.result += "\n"
         if self.high_emit_loc < self.emit_loc:
             self.high_emit_loc = self.emit_loc
 
@@ -124,11 +125,11 @@ class MyCodeEmittingUtil:
         :param comment: 注释字符串
         :return:
         """
-        print("%3d: %5s %d,%d,%d " % (self.emit_loc, opcode, target_reg, offset, value), end="")
+        self.result += ("%3d: %5s %d,%d,%d " % (self.emit_loc, opcode, target_reg, offset, value))
         self.emit_loc += 1
         if self.trace_code:
-            print("\t%s" % comment, end="")
-        print("\n", end="")
+            self.result += ("\t%s" % comment)
+        self.result += "\n"
         if self.high_emit_loc < self.emit_loc:
             self.high_emit_loc = self.emit_loc
 

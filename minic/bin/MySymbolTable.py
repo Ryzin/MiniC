@@ -156,6 +156,12 @@ class Scope(object):
         print("##################################################################\n")
 
 
+def init_scope_map():
+    """初始化作用域集合"""
+    global scope_map
+    scope_map = {}
+
+
 def get_scope(scope_id):
     """获取作用域
 

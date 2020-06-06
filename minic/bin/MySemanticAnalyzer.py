@@ -10,10 +10,15 @@
 @Desc   : 语义分析器
 """
 # main.py required
-from MyLexer import tokens, MyLexer
-from MyParser import MyParser
-from MySymbolTable import update_scope, st_lookup, st_insert, print_scope
-from MyTreeNode import NodeKind, BasicType
+from .MyLexer import tokens, MyLexer
+from .MyParser import MyParser
+from .MySymbolTable import update_scope, st_lookup, st_insert, print_scope, init_scope_map
+from .MyTreeNode import NodeKind, BasicType
+
+# from MyLexer import tokens, MyLexer
+# from MyParser import MyParser
+# from MySymbolTable import update_scope, st_lookup, st_insert, print_scope
+# from MyTreeNode import NodeKind, BasicType
 
 
 class MySemanticAnalyzer:
@@ -112,7 +117,7 @@ class MySemanticAnalyzer:
                     self.location += 1
                 else:
                     self.error_msg("Semantic error", "Variable", node_obj.child[0].name,
-                                   node_obj.child[1].lineno, "already been defined at line '%d'" % symbol.lines[0])
+                                   node_obj.child[0].lineno, "already been defined at line '%d'" % symbol.lines[0])
             elif len(node_obj.child) is 2:  # varDeclaration ~ [ID, NUM]
                 symbol, scope = st_lookup(node_obj.child[0].name, self.current_scope.id)
                 if scope is not self.current_scope:  # 在当前作用域中不存在此声明
@@ -364,12 +369,17 @@ class MySemanticAnalyzer:
                     if len(node_obj.child) < 2:
                         self.error_msg("Semantic error", "Variable", node_obj.child[0].name,
                                        node_obj.child[0].lineno, "array index missing?")
-                else:  # 声明为int，使用为arr
+                elif symbol.basic_type is BasicType.INT:  # 声明为int，使用为arr
                     if not (symbol.basic_type is node_obj.basic_type):
                         self.error_msg("Type error", "Variable", node_obj.child[0].name,
                                        node_obj.child[0].lineno,
                                        "already been defined as a '%s' value at line %d, not '%s'"
                                        % (symbol.basic_type.value, symbol.lines[0], node_obj.basic_type.value))
+                    if len(node_obj.child) != 1:
+                        self.error_msg("Type error", "Variable", node_obj.child[0].name,
+                                       node_obj.child[0].lineno,
+                                       "already been defined as a '%s' value at line %d, not arr"
+                                       % (symbol.basic_type.value, symbol.lines[0]))
 
         # call
         elif node_obj.node_kind is NodeKind.CALL_K:   # call ~ [ID, args]
@@ -407,6 +417,12 @@ class MySemanticAnalyzer:
         if self.trace_analyze:
             print("\nSymbol table:\n")
             print_scope()
+
+    def build_semantic_analyzer(self, syntax_tree_node_obj):
+        """语义分析初始化"""
+        init_scope_map()  # 重置scope_map
+        self.build_symbol_table(syntax_tree_node_obj)
+        self.type_check(syntax_tree_node_obj)
 
 
 # 测试

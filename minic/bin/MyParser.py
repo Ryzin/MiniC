@@ -118,6 +118,7 @@ def MyParser(tree_type="NST"):
             funDeclaration : typeSpecifier ID LPAREN params RPAREN compoundStmt
                            | typeSpecifier MAIN LPAREN params RPAREN compoundStmt
         """
+        # 增加MAIN
         if tree_type is "AST":
             node_kind = NodeKind.FUN_DECLARE_K
             basic_type = p[1].basic_type
@@ -139,7 +140,7 @@ def MyParser(tree_type="NST"):
                    | VOID
                    | empty
         """
-        # 增加 empty
+        # 增加empty
         if tree_type is "AST":
             if len(p) is 2:  # 排除empty
                 node_kind = NodeKind.PARAMS_K
@@ -566,14 +567,12 @@ def MyParser(tree_type="NST"):
             print("Syntax missing EOF")
 
     def normal_syntax_tree(p, name, node_kind=None, basic_type=None):
-        """
-
-        生成普通语法树NST节点的方法（与之对应的是抽象语法树AST）
+        """生成普通语法树NST节点的方法（与之对应的是抽象语法树AST）
 
         :param p: p的引用
         :param name: 当前节点名
-        :param node_kind:
-        :param basic_type:
+        :param node_kind: 节点类型枚举引用
+        :param basic_type: 基本类型枚举引用
         :return:
         """
         p[0] = MyTreeNode(name, node_kind=node_kind, basic_type=basic_type)

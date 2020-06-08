@@ -17,7 +17,7 @@ from .MyTreeNode import NodeKind, BasicType
 
 # from MyLexer import tokens, MyLexer
 # from MyParser import MyParser
-# from MySymbolTable import update_scope, st_lookup, st_insert, print_scope
+# from MySymbolTable import update_scope, st_lookup, st_insert, print_scope, init_scope_map
 # from MyTreeNode import NodeKind, BasicType
 
 
@@ -353,7 +353,7 @@ class MySemanticAnalyzer:
         elif node_obj.node_kind is NodeKind.ARITHMETIC_K:
             # additiveExpression ~ [additiveExpression, addop, term]
             # term ~ [term, mulop, factor]
-            # 检查运算符左右的值是否为int（对于二元运算符，另一种方式是运算符作为树根，针对左右子树进行类型判断）
+            # 检查运算符左右的值是否为int
             if not (node_obj.child[0].basic_type is BasicType.INT and
                     node_obj.child[2].basic_type is BasicType.INT):
                 self.error_msg("Type error", "Arithmetic Expression", node_obj.child[1].name,
@@ -434,21 +434,19 @@ if __name__ == '__main__':
 
     # 测试用例
     source_str = """
-// Fibonacci
-int f(int m)
-{
-     if (m <= 2)
-          return 1;
-     else
-          return f(m - 1) + f(m - 2);
+int gcd (int u, int v)
+{   if (v == 0)return u;
+    else {
+           return gcd(v, u-u/v*v);
+           }
+    /* u-u/v*v == u mod v */
 }
 
-void main() {
-     int x;
-     while (1) {
-         x = input();
-         output(f(x));
-     }
+void main(void) {
+    int x; int y;
+    x = input();
+    y = input();
+    output(gcd(x, y));
 }
         """
 

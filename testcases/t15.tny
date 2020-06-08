@@ -1,0 +1,18 @@
+int f(int m) 
+{
+     int a[2];
+     if (m <= 2) {
+          a[0] = m + 1;
+          return a[0];
+     }
+     else {
+          a[1] = m + 2;
+          return f(m - 1) + a[1];
+     }
+}
+
+void main() {
+     int x;
+     x = input();
+     output(f(x));
+}

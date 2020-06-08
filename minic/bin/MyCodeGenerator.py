@@ -51,7 +51,12 @@ def code_generate(node_obj, scope_id):
             code_generate(obj, global_scope_id)
 
     # elif node_obj.node_kind is NodeKind.VAR_DECLARE_K:  # 赋值时才需要Load value
-        # varDeclaration ~ [ID, (NUM)]
+    #     # varDeclaration ~ [ID, (NUM)]
+    #     if emit_util.trace_code:
+    #         emit_util.emit_comment("-> VarDeclaration")
+    #
+    #     if emit_util.trace_code:
+    #         emit_util.emit_comment("<- VarDeclaration")
 
     elif node_obj.node_kind is NodeKind.FUN_DECLARE_K:
         # funDeclaration ~ [ID, params, compoundStmt]
@@ -222,9 +227,18 @@ def code_generate(node_obj, scope_id):
 
             # 保存值（d_mem[(loc + offset) + reg[GP]] = reg[AC0]）
             emit_util.emit_rm("ST", MyRegister.AC0, 0, MyRegister.AC1, "assign: store value")
+
+            # 如果是在函数调用过程，则要保存本地变量到函数栈栈顶栈帧
+            emit_util.emit_ms("SUB", MyRegister.AC1, MyRegister.AC1, MyRegister.GP,
+                              "assign: ((loc + offset) + reg[GP]) - reg[GP]")
+            emit_util.emit_ms("PSA", MyRegister.AC0, MyRegister.AC1, 2,
+                              "assign: store local variable to top frame if exist")
         else:  # 普通变量
             # 直接将寄存器AC0结果保存至内存位置
             emit_util.emit_rm("ST", MyRegister.AC0, loc, MyRegister.GP, "assign: store value")  # 存值指令
+
+            # 如果是在函数调用过程，则要保存本地变量到函数栈栈顶栈帧
+            emit_util.emit_ms("PSA", MyRegister.AC0, loc, 0, "assign: store local variable to top frame if exist")
 
         if emit_util.trace_code:
             emit_util.emit_comment("<- Assign")

@@ -9,9 +9,7 @@ int f(int m)
 
 void main() {
      int x;
-     while (1) {
-         x = input();
-         output(f(x));
-     }
+     x = input();
+     output(f(x)); 
 }
 

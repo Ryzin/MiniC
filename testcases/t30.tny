@@ -1,0 +1,6 @@
+void fun(){}
+void main(){
+  if(fun < 1){
+
+  }
+}

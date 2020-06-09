@@ -1,0 +1,3 @@
+void a(int x, int x){}
+void main(){
+}

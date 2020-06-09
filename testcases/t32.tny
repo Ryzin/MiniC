@@ -1,0 +1,5 @@
+void fun(){}
+void main(){
+  int x;
+  x = fun() + 1;
+}

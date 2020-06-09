@@ -1,0 +1,8 @@
+int fun(int x, int y){
+  return 0;
+}
+void main(){
+  int a;
+  int b[2];
+  a = fun(a, b);
+}

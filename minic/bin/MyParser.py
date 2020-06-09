@@ -88,7 +88,7 @@ def MyParser(tree_type="NST"):
         """
         if tree_type is "AST":
             node_kind = NodeKind.VAR_DECLARE_K
-            basic_type = BasicType.INT
+            basic_type = p[1].basic_type
             p[0] = MyTreeNode('varDeclaration', node_kind=node_kind, basic_type=basic_type)
 
             # 仅添加ID、NUM为孩子
@@ -310,6 +310,7 @@ def MyParser(tree_type="NST"):
                 node_kind = NodeKind.RETURN_K
                 basic_type = p[2].basic_type
             p[0] = MyTreeNode('returnStmt', node_kind=node_kind, basic_type=basic_type)
+            p[0].lineno = p.lineno(1)
 
             # 仅添加expression为孩子
             if len(p) is 4:
@@ -359,6 +360,7 @@ def MyParser(tree_type="NST"):
             node_kind = NodeKind.VAR_K
             basic_type = BasicType.INT
             p[0] = MyTreeNode('var', node_kind=node_kind, basic_type=basic_type)
+            p[0].lineno = p.lineno(1)
 
             # 仅添加ID、expression作为孩子
             p[0].add_child(p[1])  # ID

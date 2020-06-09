@@ -192,10 +192,10 @@ class MySemanticAnalyzer:
             if symbol is None:  # 在包围作用域中不存在此声明
                 self.error_msg("Semantic error", "Variable", node_obj.child[0].name,
                                node_obj.child[0].lineno, "not defined")
-            else:
-                # 符号表中已存在该变量，只追加行号
+            else:  # 符号表中已存在该变量，只追加行号
                 st_insert(symbol.name, 0, symbol.id_kind, symbol.basic_type,
                           1, node_obj.child[0].lineno, scope.id, scope.level)
+                node_obj.node_kind = symbol.id_kind  # 根据声明重新确定类型
 
     def get_return_stmt_from_statement(self, statement):
         """statement中获取returnStmt
@@ -239,9 +239,13 @@ class MySemanticAnalyzer:
 
         return_stmt = None
         # 遍历statementList，检查各statement有没有有效的returnStmt
-        for statement in statement_list.child:
-            return_stmt = self.get_return_stmt_from_statement(statement)
+        for i in range(0, len(statement_list.child)):
+            return_stmt = self.get_return_stmt_from_statement(statement_list.child[i])
             if return_stmt is not None:
+                if i != len(statement_list.child) - 1:  # 如果return不是最后一个statement
+                    self.error_msg("Semantic error", "Statement", 'return',
+                                   statement_list.child[i].lineno,
+                                   "statement behind return statement not reachable")
                 break
 
         return return_stmt
@@ -296,17 +300,18 @@ class MySemanticAnalyzer:
 
         # funDeclaration
         elif node_obj.node_kind is NodeKind.FUN_DECLARE_K:
-            # 函数声明是否有返回值并检查返回值类型
+            # 函数声明是否有返回语句或有返回值，并检查返回值类型
             basic_type = node_obj.basic_type
             # 返回类型为void和int都要进行检查
             compound_stmt = node_obj.child[2]  # funDeclaration ~ [ID, params, compoundStmt]
             return_stmt = self.get_return_stmt_from_compound_stmt(compound_stmt)  # returnStmt ~ [(expression)]
-            if return_stmt is None:  # 没有返回值，且函数声明的返回类型不为void，输出错误信息
+            if return_stmt is None or len(return_stmt.child) == 0:
+                # 没有返回语句或没有返回值，且函数声明的返回类型不为void，输出错误信息
                 if basic_type is not BasicType.VOID:
                     self.error_msg("Semantic error", "Function", node_obj.child[0].name,
                                    node_obj.child[0].lineno,
                                    "need to return a '%s' value" % basic_type.value)
-            else:  # 有返回值，且函数声明的返回类型与返回值的类型不同，输出错误信息
+            else:  # 有返回语句，且函数声明的返回类型与返回值的类型不同，输出错误信息
                 if not (return_stmt.node_kind is NodeKind.RETURN_K
                         and return_stmt.child[0].basic_type is basic_type):
                     self.error_msg("Semantic error", "Function", node_obj.child[0].name,
@@ -316,50 +321,51 @@ class MySemanticAnalyzer:
         # selectionStmt or iterationStmt
         elif node_obj.node_kind is NodeKind.SELECTION_K or node_obj.node_kind is NodeKind.ITERATION_K:
             # 检查if和while语句中的表达式类型
-            if not (node_obj.child[0].basic_type is BasicType.BOOL or node_obj.child[0].basic_type is BasicType.INT):
+            if node_obj.child[0].basic_type is BasicType.VOID or node_obj.child[0].node_kind is NodeKind.FUNC_K:
                 # selectionStmt ~ [expression, ...]
                 # iterationStmt ~ [expression, ...]
                 statement_name = "if" if node_obj.node_kind is NodeKind.SELECTION_K else "while"
                 self.error_msg("Type error", "Statement", statement_name,
-                               node_obj.lineno,
-                               "the result of the expression is a '%s' value"
-                               % node_obj.child[0].basic_type.value)
+                               node_obj.lineno, "the result of the expression only accept a int or bool value")
 
         # simpleExpression
         elif node_obj.node_kind is NodeKind.COMPARE_K:
             if len(node_obj.child) is 3:  # simpleExpression ~ [additiveExpression, relop, additiveExpression]
-                if not (node_obj.child[0].basic_type is BasicType.INT and
-                        node_obj.child[2].basic_type is BasicType.INT):  # 表达式左右值
+                if not (node_obj.child[0].basic_type is BasicType.INT and node_obj.child[2].basic_type is BasicType.INT):
                     self.error_msg("Type error", "Comparison Expression", node_obj.child[1].name,
-                                   node_obj.child[1].lineno,
-                                   "not supported between value of '%s' and '%s'"
+                                   node_obj.child[1].lineno, "not supported between value of '%s' and '%s'"
                                    % (node_obj.child[0].basic_type.value, node_obj.child[2].basic_type.value))
+                if node_obj.child[0].node_kind is NodeKind.FUNC_K or node_obj.child[2].node_kind is NodeKind.FUNC_K:
+                    self.error_msg("Type error", "Comparison Expression", node_obj.child[1].name,
+                                   node_obj.child[1].lineno, "the result of the expression only accept a int value")
             elif len(node_obj.child) is 1:  # simpleExpression ~ [additiveExpression]
                 if not (node_obj.child[0].basic_type is (BasicType.INT or BasicType.BOOL)):
                     self.error_msg("Type error", "Comparison Expression", '',
-                                   node_obj.child[0].lineno,
-                                   "not supported '%s' value"
-                                   % node_obj.child[0].basic_type.value)
+                                   node_obj.child[0].lineno, "not supported '%s' value" % node_obj.child[0].basic_type.value)
+                if node_obj.child[0].node_kind is NodeKind.FUNC_K:
+                    self.error_msg("Type error", "Comparison Expression", '', node_obj.child[0].lineno,
+                                   "the result of the expression only accept a int value")
 
         # assignExpression
         elif node_obj.node_kind is NodeKind.ASSIGN_K:
             if node_obj.child[1].basic_type is not BasicType.INT:  # assignExpression ~ [var, expression]
                 self.error_msg("Type error", "Assignment Expression", '=',
-                               node_obj.child[1].lineno,
-                               "not supported '%s' value"
-                               % node_obj.child[1].basic_type.value)
+                               node_obj.child[0].lineno, "not supported '%s' value" % node_obj.child[1].basic_type.value)
+            if node_obj.child[1].node_kind is NodeKind.FUNC_K:
+                self.error_msg("Type error", "Assignment Expression", '=',
+                               node_obj.child[0].lineno, "the result of the expression only accept a int value")
 
         # additiveExpression or term
         elif node_obj.node_kind is NodeKind.ARITHMETIC_K:
-            # additiveExpression ~ [additiveExpression, addop, term]
-            # term ~ [term, mulop, factor]
+            # additiveExpression ~ [additiveExpression, addop, term]  term ~ [term, mulop, factor]
             # 检查运算符左右的值是否为int
-            if not (node_obj.child[0].basic_type is BasicType.INT and
-                    node_obj.child[2].basic_type is BasicType.INT):
+            if not (node_obj.child[0].basic_type is BasicType.INT and node_obj.child[2].basic_type is BasicType.INT):
                 self.error_msg("Type error", "Arithmetic Expression", node_obj.child[1].name,
-                               node_obj.child[0].lineno,
-                               "not supported between value of '%s' and '%s'"
+                               node_obj.child[0].lineno, "not supported between value of '%s' and '%s'"
                                % (node_obj.child[0].basic_type.value, node_obj.child[2].basic_type.value))
+            if node_obj.child[0].node_kind is NodeKind.FUNC_K or node_obj.child[2].node_kind is NodeKind.FUNC_K:
+                self.error_msg("Type error", "Comparison Expression", node_obj.child[1].name,
+                               node_obj.child[1].lineno, "the result of the expression only accept a int value")
 
         # var
         elif node_obj.node_kind is NodeKind.VAR_K:  # var ~ [ID, (expression)]
@@ -385,17 +391,19 @@ class MySemanticAnalyzer:
         elif node_obj.node_kind is NodeKind.CALL_K:   # call ~ [ID, args]
             symbol, scope = st_lookup(node_obj.child[0].name, self.current_scope.id)
             arg_count = len(node_obj.child[1].child)
-            if symbol.size != arg_count:  # 检查参数列表长度是否匹配
-                self.error_msg("Semantic error", "Call", node_obj.child[0].name,
-                               node_obj.child[0].lineno, "list of argument not match")
-            else:
-                for i in (0, arg_count-1):  # 检查每一个参数
-                    expression = node_obj.child[1].child[i]  # args ~ [expression, expression, ...]
-                    # 在函数声明包裹的作用域的符号表查找参数
-                    param_symbol = symbol.included_scope.lookup_symbol_by_index(i)  # 函数声明的参数符号会在符号表最前
-                    if param_symbol.basic_type is not expression.basic_type:  # 检查参数类型是否匹配
-                        self.error_msg("Semantic error", "Call", node_obj.child[0].name,
-                                       node_obj.child[0].lineno, "type of argument not match")
+            if symbol is not None and symbol.id_kind is NodeKind.FUNC_K:  # 在包围作用域中存在此声明
+                if symbol.size != arg_count:  # 检查参数列表长度是否匹配
+                    self.error_msg("Semantic error", "Call", node_obj.child[0].name,
+                                   node_obj.child[0].lineno, "list of argument not match")
+                else:
+                    i = 0
+                    for expression in node_obj.child[1].child:  # args ~ [expression, expression, ...]
+                        # 在函数声明包裹的作用域的符号表查找参数
+                        param_symbol = symbol.included_scope.lookup_symbol_by_index(i)  # 函数声明的参数符号会在符号表最前
+                        i += 1
+                        if param_symbol.basic_type is not expression.basic_type:  # 检查参数类型是否匹配
+                            self.error_msg("Semantic error", "Call", node_obj.child[0].name,
+                                           node_obj.child[0].lineno, "type of argument not match")
 
     def type_check(self, syntax_tree_node_obj):
         """后序遍历进行类型检查
@@ -434,19 +442,20 @@ if __name__ == '__main__':
 
     # 测试用例
     source_str = """
-int gcd (int u, int v)
-{   if (v == 0)return u;
-    else {
-           return gcd(v, u-u/v*v);
-           }
-    /* u-u/v*v == u mod v */
+int factorial(int i)
+{
+   if(i <= 1)
+   {
+      return 1;
+   }
+   return i * factorial(i - 1);
 }
-
-void main(void) {
-    int x; int y;
-    x = input();
-    y = input();
-    output(gcd(x, y));
+int  main()
+{
+    int i;
+    i = input();
+    output(factorial(i));
+    return 0;
 }
         """
 

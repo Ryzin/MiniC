@@ -198,20 +198,26 @@ class MyMainWindow(QMainWindow):
 
                         # 进行语义分析
                         my_semantic_analyzer = MySemanticAnalyzer()
-                        my_semantic_analyzer.build_semantic_analyzer(root_node)
+                        try:
+                            my_semantic_analyzer.build_semantic_analyzer(root_node)
+                        except:
+                            print("Semantic Analyzer got Fatal Error")
+
                         if my_semantic_analyzer.error:
                             print("Semantic Analyzer found errors")
                         else:
                             print("Symbol Table has been built and Type Check has executed")
 
                             # 进行目标代码生成
-                            object_code = build_code_generator(root_node)
-                            self.update_code_generate_text_edit(object_code)
-                            print("Object Code has been generated\nBuild successfully")
-
-                            # 进行解释执行
-                            print("Interpreter is handling Object Code now\n")
-                            build_interpreter(object_code, "gui")
+                            try:
+                                object_code = build_code_generator(root_node)
+                                self.update_code_generate_text_edit(object_code)
+                                print("Object Code has been generated\nBuild successfully")
+                                # 进行解释执行
+                                print("Interpreter is handling Object Code now\n")
+                                build_interpreter(object_code, "gui")
+                            except:
+                                print("Interpreter got Fatal Error")
                     else:
                         print("Normal Syntax Tree has been generated")
                         print("If 'NST' is selected, program will not run Semantic Analyzer and Code Generator")

@@ -18,6 +18,7 @@ from .MySymbolTable import st_lookup
 # from MyTreeNode import NodeKind, BasicType
 # from MySymbolTable import st_lookup
 
+
 emit_util = None  # 代码发行对象
 # tmp_offset = None  # 临时变量栈的顶部指针（已过时，由于代码生成的弊端，会使在递归调用函数时，该指针并不能正确指示栈顶位置）
 global_scope_id = None  # 作用域id计数器
@@ -75,7 +76,7 @@ def code_generate(node_obj, scope_id):
         symbol.mem_loc = emit_util.emit_skip(0)  # 保存指令位置
 
         # 生成函数体的代码（返回值保存至寄存器AC0）
-        code_generate(p3, global_scope_id)
+        code_generate(p3, global_scope_id)  # compoundStmt ~ [LBRACE, localDeclarations, statementList, RBRACE]
 
         if p1.name != "main":
             # 从函数栈栈顶栈帧中取返回点，更新活动记录，跳转回调用位置（返回点保存至寄存器AC1）
@@ -183,13 +184,19 @@ def code_generate(node_obj, scope_id):
             emit_util.emit_comment("<- While")
 
     elif node_obj.node_kind is NodeKind.RETURN_K:
-        # returnStmt ~ [expression]
+        # returnStmt ~ [(expression)]
         if emit_util.trace_code:
             emit_util.emit_comment("<- Return")
 
         # 保存返回值到寄存器AC0
-        if node_obj.child is not None:  # 有返回值
-            code_generate(node_obj.child[0], global_scope_id)
+        if len(node_obj.child) > 0:  # 有返回值
+            code_generate(node_obj.child[0], global_scope_id)  # expressio
+
+        # 从函数栈栈顶栈帧中取返回点，更新活动记录，跳转回调用位置（返回点保存至寄存器AC1）
+        emit_util.emit_ms("LDR", MyRegister.AC1, 0, 0, "return: load return point from top frame")  # 取返回点指令
+        emit_util.emit_ms("POM", 0, 0, 0, "return: pop top frame")  # 函数栈退栈指令
+        emit_util.emit_ms("REA", 0, 0, 0, "return: restore new activity record")  # 更新活动记录
+        emit_util.emit_rm("LDA", MyRegister.PC, 0, MyRegister.AC1, "return: jmp back call")  # 无条件转移指令
 
         if emit_util.trace_code:
             emit_util.emit_comment("<- Return")
@@ -267,8 +274,8 @@ def code_generate(node_obj, scope_id):
             emit_util.emit_ms("PSA", MyRegister.AC0, param_symbol.mem_loc, is_refer, "call: store new arg to top frame")
             i += 1
 
-        # 实参更新到内存
-        emit_util.emit_ms("REA", 0, 0, 0, "call: restore all arg in top frame to memory")
+        # 实参更新到形参内存
+        emit_util.emit_ms("REA", 0, 0, 0, "call: restore all arg and local variable in top frame to memory")
 
         # 在函数栈栈顶的栈帧中设置返回点（跳过以下跳转指令）
         emit_util.emit_ms("STR", MyRegister.PC, 1, 0, "call: store return point to top frame")  # 存返回点指令
@@ -333,7 +340,7 @@ def code_generate(node_obj, scope_id):
                 # 生成expression的代码，数组索引值offset保存到寄存器AC0
                 code_generate(node_obj.child[1], global_scope_id)  # expression
 
-                # 获取数组的内存位置loc，保存至寄存器AC1
+                # 获取数组首地址loc，保存至寄存器AC1
                 emit_util.emit_ms("LDL", MyRegister.AC1, loc, 0, "var: load true location of array")
 
                 # 计算loc + offset，保存至寄存器AC0
@@ -485,21 +492,20 @@ if __name__ == '__main__':
 
     # 测试用例
     source_str = """
-// Fibonacci
-int f(int m)
+int factorial(int i)
 {
-     if (m <= 2)
-          return 1;
-     else
-          return f(m - 1) + f(m - 2);
+   if(i <= 1)
+   {
+      return 1;
+   }
+   return i * factorial(i - 1);
 }
-
-void main() {
-     int x;
-     while (1) {
-         x = input();
-         output(f(x));
-     }
+int  main()
+{
+    int i;
+    i = input();
+    output(factorial(i));
+    return 0;
 }
 """
 
@@ -519,15 +525,14 @@ void main() {
 
     # 语义分析器构建符号表和错误检查
     my_semantic_analyzer = MySemanticAnalyzer()
-    my_semantic_analyzer.build_symbol_table(root_node)
-    my_semantic_analyzer.type_check(root_node)
+    my_semantic_analyzer.build_semantic_analyzer(root_node)
+    if not my_semantic_analyzer.error:
+        # 代码生成初始化
+        build_code_generator(root_node)
+        print(emit_util.result)
 
     # 打印语法树
     # root_node.print()
-
-    # 代码生成初始化
-    build_code_generator(root_node)
-    print(emit_util.result)
 
     # 打印作用域和符号表信息
     # print_scope()

@@ -1,5 +1,13 @@
 # 简易 C 语言编译器 / Mini C / Simple C Compiler / C -
   
+
+![语法分析](img/parser.png)
+
+
+<br/>
+<br/>
+
+
 ## Contributors  
 
 - Contributors

@@ -1,5 +1,13 @@
 # 简易 C 语言编译器 / Mini C / Simple C Compiler / C -
-  
+
+
+![语法分析](img/parser.png)
+
+
+<br/>
+<br/>
+
+
 ## Contributors  
 
 - Contributors
@@ -16,7 +24,7 @@
 
 ## Introduction
 
-> 题目出处自《编译原理与实践》Kenneth C.Louden 一书的“附录 A 编译器设计方案”
+> 题目出处自《编译原理与实践》Kenneth C.Louden 一书的“[附录 A 编译器设计方案](c_minus.pdf)”
 
 本项目是基于 ply 和 PyQt5 开发的一个简易的 C 语言编译器。  
 本来想说作为我校编译原理的一个期末课程作业，作为普通作业做一下就可以了。但是做的过程发现还是挺有意思的，所以就多用了点心思，不仅完整的完成了所有功能，还提供一个比较美观的 GUI 界面。  
@@ -39,7 +47,7 @@
 
 ## Lex and Grammar
 
-> [词法规则和语法规则](http://read.pudn.com/downloads93/ebook/365454/c_minus.pdf)
+> [词法规则和语法规则](c_minus.pdf)
 
 
 <br/>

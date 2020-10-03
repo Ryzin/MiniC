@@ -1,4 +1,4 @@
-# 简易 C 语言编译器 / Mini C / Simple C Compiler / C -
+# 简易 C 语言编译器 / Mini C / Simple C Compiler / C Minus
 
 
 ![语法分析](img/parser.png)
@@ -29,8 +29,8 @@
 ## Contributors  
 
 - Contributors
-  - 罗佳海 20172131144  
-  - 吴梓祺 20172131096  
+  - 罗佳海 
+  - 吴梓祺
 
 - Organization  
   South China Normal University, Computer Science, 2017   
@@ -45,8 +45,7 @@
 > 题目出处自《编译原理与实践》Kenneth C.Louden 一书的“[附录 A 编译器设计方案](c_minus.pdf)”
 
 本项目是基于 ply 和 PyQt5 开发的一个简易的 C 语言编译器。  
-本来想说作为我校编译原理的一个期末课程作业，作为普通作业做一下就可以了。但是做的过程发现还是挺有意思的，所以就多用了点心思，不仅完整的完成了所有功能，还提供一个比较美观的 GUI 界面。  
-不过本项目还是有许多问题，比如没有做好二元运算的左值右值类型检查，函数栈本地变量表的记录等，这也大概就是浴帘只给我一个靠近 90 分的分数而已吧。（逃
+不过本项目还是有许多问题，比如没有做好二元运算的左值右值类型检查，函数栈本地变量表的记录等.
 
 
 <br/>

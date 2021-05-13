@@ -462,8 +462,8 @@ def MyParser(tree_type="NST"):
         """
         if tree_type is "AST":
             if len(p) is 4:
-                node_kind = p[1].node_kind
-                basic_type = p[1].basic_type
+                node_kind = p[2].node_kind
+                basic_type = p[2].basic_type
                 p[0] = MyTreeNode('factor', node_kind=node_kind, basic_type=basic_type)
 
                 # 仅添加expression为孩子
